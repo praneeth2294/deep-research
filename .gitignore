@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# Environments & secrets
+.env
+.venv/
+
+# Tool caches
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Local databases (checkpoints, vector stores - arrive in Phase 5)
+*.sqlite
+*.db
+data/
+
+# IDE
+.idea/
+.vscode/
+
+# Large reference material (kept locally, not in version control - 50 MB)
+Agenticai-1.pdf
