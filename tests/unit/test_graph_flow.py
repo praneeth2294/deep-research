@@ -26,9 +26,10 @@ from deep_research.graph.nodes import synthesizer as synth_node
 from deep_research.graph.nodes import writer as writer_node_mod
 from deep_research.schemas.analysis import Claim, ClaimSet, SynthesisOutput
 from deep_research.schemas.planner import PlannerOutput, SubTopic
-from deep_research.schemas.research import Source
+from deep_research.schemas.research import ReactStep, Source
 from deep_research.schemas.review import ReviewVerdict
 from deep_research.schemas.routing import RouteDecision
+from deep_research.tools.registry import ToolSpec
 
 
 class _Invoker:
@@ -89,12 +90,22 @@ def test_full_flow_with_replan_and_revision(monkeypatch: pytest.MonkeyPatch) -> 
     )
     monkeypatch.setattr(planner, "structured_llm", fake_structured(plan))
 
-    def fake_search(query: str, max_results: int = 5) -> list[Source]:
+    def fake_search(query: str) -> list[Source]:
         if query == "bad-query":
             return [Source(url="https://facebook.com/groups/1/posts/2", title="p", snippet="thin")]
         return _good_sources(query.replace("query-", ""))
 
-    monkeypatch.setattr(researcher, "search_web", fake_search)
+    # Researchers: seeded search through the registry, then the agent finishes.
+    monkeypatch.setattr(
+        researcher,
+        "get_tool",
+        lambda name: ToolSpec(name=name, description="fake", run=fake_search),
+    )
+    monkeypatch.setattr(
+        researcher,
+        "structured_llm",
+        fake_structured(ReactStep(reasoning="seed evidence is sufficient", action="finish")),
+    )
 
     monkeypatch.setattr(
         replanner,

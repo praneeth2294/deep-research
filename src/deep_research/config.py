@@ -74,7 +74,11 @@ class Settings(BaseSettings):
     max_session_budget_usd: float = Field(default=1.0, gt=0)
     max_react_iterations: int = Field(default=5, ge=1, le=20)
     max_writer_revisions: int = Field(default=2, ge=0, le=5)
-    requests_per_minute: int = Field(default=30, ge=1)
+    requests_per_minute: int = Field(
+        default=12,
+        ge=1,
+        description="Shared RPM cap across all LLM calls; free-tier Gemini allows ~10-20.",
+    )
 
     # --- Quality thresholds -------------------------------------------------
     gate_quality_threshold: float = Field(

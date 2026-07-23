@@ -53,10 +53,19 @@ def _run(topic: str) -> None:
     for sub_topic in sub_topics:
         print(f"  - {sub_topic.title}  [query: {sub_topic.search_query}]")
 
-    replanned = [r for r in result.get("research_results", []) if r.attempt >= 2]
-    if replanned:
-        titles = ", ".join(r.sub_topic.title for r in replanned)
-        print(f"Replanned after quality gate: {titles}")
+    for research in result.get("research_results", []):
+        tools_used = sorted(
+            {
+                line.split("(", 1)[0].removeprefix("Action: ")
+                for line in research.history
+                if line.startswith("Action: ")
+            }
+        )
+        suffix = " (replanned)" if research.attempt >= 2 else ""
+        print(
+            f"  {research.sub_topic.title}{suffix}: {len(research.sources)} sources "
+            f"via {', '.join(tools_used) or 'no tools'}"
+        )
     review = result.get("review")
     if review is not None:
         revisions = result.get("revision_count", 0)

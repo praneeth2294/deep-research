@@ -195,7 +195,34 @@ uv run pytest tests/unit/test_tiering.py -v
 | `MAX_SESSION_BUDGET_USD` | `1.0` | Hard cap — LLM calls raise once estimated spend reaches it |
 | `REQUESTS_PER_MINUTE` | `30` | Shared rate limit across ALL model calls (lower it if you see 429s on free tier) |
 
-## Phase 4 — ReAct Researchers + Tool Registry *(arrives with sprint 04)*
+## Phase 4 — ReAct Researchers + Tool Registry
+
+Researchers are now bounded ReAct agents: each one runs a seeded search, then
+up to `MAX_REACT_ITERATIONS` self-chosen tool calls (tavily_search / wikipedia /
+fetch_url), then finishes. The CLI shows the tool trace per sub-topic:
+
+```
+  Framework Ecosystem and Core Capabilities: 29 sources via tavily_search
+```
+
+### Run the ReAct mechanics tests (offline — cap proof, tool choice, breaker)
+
+```bash
+uv run pytest tests/unit/test_react_researcher.py tests/unit/test_scraper.py tests/unit/test_registry.py tests/unit/test_injection.py -v
+```
+
+### New knob
+
+| Variable | Default | Effect |
+|---|---|---|
+| `MAX_REACT_ITERATIONS` | `5` | Hard cap on LLM decisions per researcher (plus 1 free seeded search) |
+
+### Troubleshooting additions
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `429 RESOURCE_EXHAUSTED ... PerDay ... FreeTier` | Free-tier Gemini has small **per-day** quotas per model; ReAct multiplies call volume | Wait for the daily reset, lower `REQUESTS_PER_MINUTE` (default now 12), reduce `MAX_REACT_ITERATIONS`, or use a paid key |
+| `CircuitOpenError` in researcher history | A domain failed 3+ times recently | Expected behavior — the agent adapts; the domain is retried after a 5-minute cooldown |
 
 ## Phase 5 — Memory *(arrives with sprint 05)*
 
@@ -218,7 +245,7 @@ Will add: `docker compose up` (full stack) and the one-command demo.
 
 ---
 
-## Run the whole application (current state: Phase 3)
+## Run the whole application (current state: Phase 4)
 
 1. One-time setup (if not done): `uv sync`, copy `.env.example` → `.env`, fill
    `GOOGLE_API_KEY` + `TAVILY_API_KEY`.
@@ -231,11 +258,16 @@ uv run research "your research topic here"
 What happens: **router** (cheap LLM) triages the topic — trivial questions go
 straight to **simple_answer** (one search + one cited answer, done). Otherwise:
 **planner** decomposes the topic into 1–3 sub-topics → **researchers run in
-parallel** (Send() fan-out) → **quality gate** (pure Python) scores evidence;
-failing sub-topics go to the **replanner** for one bounded re-research →
-**analyst** dedupes sources and extracts claims → **synthesizer** cross-references
-and detects conflicts → **writer** drafts the cited report → **reviewer** scores
-0–10 with a bounded revision loop → report + sources + **cost summary** printed.
+parallel as bounded ReAct agents** (seeded search, then up to N self-chosen
+tavily/wikipedia/fetch_url calls, action history recorded) → **quality gate**
+(pure Python) scores evidence; failing sub-topics go to the **replanner** for one
+bounded re-research → **analyst** dedupes sources and extracts claims →
+**synthesizer** cross-references and detects conflicts → **writer** drafts the
+cited report → **reviewer** scores 0–10 with a bounded revision loop → report +
+sources + **cost summary** printed.
+
+All scraped/searched text is injection-sanitized at the tool registry; the
+scraper enforces SSRF policy, timeouts, and a per-domain circuit breaker.
 
 Cross-cutting: all LLM calls flow through budget gate → fallback chain → shared
 rate limiter; the session stops cleanly if `MAX_SESSION_BUDGET_USD` is reached.
