@@ -9,7 +9,7 @@ the identical query.
 from typing import cast
 
 from deep_research.graph.state import ResearchState
-from deep_research.llm.tiering import cheap_llm
+from deep_research.llm.tiering import structured_llm
 from deep_research.prompts import load_prompt
 from deep_research.schemas.planner import PlannerOutput, SubTopic
 
@@ -19,10 +19,9 @@ def replanner_node(state: ResearchState) -> ResearchState:
     failed_block = "\n".join(
         f"- title: {s.title}\n  failed query: {s.search_query}" for s in failed
     )
-    llm = cheap_llm().with_structured_output(PlannerOutput)
     revised = cast(
         PlannerOutput,
-        llm.invoke(
+        structured_llm(PlannerOutput, tier="cheap").invoke(
             [
                 ("system", load_prompt("replanner")),
                 (

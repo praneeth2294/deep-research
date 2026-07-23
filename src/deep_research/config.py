@@ -19,6 +19,10 @@ from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+def _split_models(raw: str) -> list[str]:
+    return [name.strip() for name in raw.split(",") if name.strip()]
+
+
 class Settings(BaseSettings):
     """Process-wide configuration, loaded from environment / .env file."""
 
@@ -43,6 +47,24 @@ class Settings(BaseSettings):
             "STRONG_MODEL when using a paid key."
         ),
     )
+    cheap_fallbacks: str = Field(
+        default="gemini-3-flash-preview",
+        description="Comma-separated fallback models tried when the cheap model fails.",
+    )
+    strong_fallbacks: str = Field(
+        default="gemini-flash-latest",
+        description="Comma-separated fallback models tried when the strong model fails.",
+    )
+
+    @property
+    def cheap_model_chain(self) -> list[str]:
+        """Primary cheap model followed by its fallbacks (order matters)."""
+        return [self.cheap_model, *_split_models(self.cheap_fallbacks)]
+
+    @property
+    def strong_model_chain(self) -> list[str]:
+        """Primary strong model followed by its fallbacks (order matters)."""
+        return [self.strong_model, *_split_models(self.strong_fallbacks)]
 
     # --- API keys (optional at import time; call sites fail fast) ----------
     google_api_key: SecretStr | None = None

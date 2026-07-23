@@ -23,9 +23,30 @@ def _smoke_check() -> None:
 def _run(topic: str) -> None:
     # Imported lazily so `research` (smoke check) works without heavy deps loading.
     from deep_research.graph.builder import build_graph
+    from deep_research.guardrails.budget import BudgetExceededError
+    from deep_research.observability.cost import session_cost
 
     print(f"Researching: {topic}\n")
-    result = build_graph().invoke({"topic": topic})
+    try:
+        result = build_graph().invoke(
+            {"topic": topic}, config={"callbacks": [session_cost.callback]}
+        )
+    except BudgetExceededError as exc:
+        print(f"STOPPED: {exc}")
+        print(session_cost.summary())
+        return
+
+    route = result.get("route")
+    if route:
+        print(f"Route: {route}")
+    if route == "simple_lookup":
+        print("\n" + "=" * 72)
+        print(result.get("report", "(no answer produced)"))
+        print("=" * 72 + "\nSources:")
+        for i, source in enumerate(result.get("sources", []), start=1):
+            print(f"  [{i}] {source.title} — {source.url}")
+        print("\n" + session_cost.summary())
+        return
 
     sub_topics = result.get("sub_topics", [])
     print(f"Plan ({len(sub_topics)} sub-topic{'s' if len(sub_topics) != 1 else ''}):")
@@ -46,6 +67,7 @@ def _run(topic: str) -> None:
     print("=" * 72 + "\nSources:")
     for i, source in enumerate(result.get("sources", []), start=1):
         print(f"  [{i}] {source.title} — {source.url}")
+    print("\n" + session_cost.summary())
 
 
 def main() -> None:

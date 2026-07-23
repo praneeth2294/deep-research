@@ -8,16 +8,15 @@ bounded by `max_writer_revisions`.
 from typing import cast
 
 from deep_research.graph.state import ResearchState
-from deep_research.llm.tiering import cheap_llm
+from deep_research.llm.tiering import structured_llm
 from deep_research.prompts import load_prompt
 from deep_research.schemas.review import ReviewVerdict
 
 
 def reviewer_node(state: ResearchState) -> ResearchState:
-    llm = cheap_llm().with_structured_output(ReviewVerdict)
     verdict = cast(
         ReviewVerdict,
-        llm.invoke(
+        structured_llm(ReviewVerdict, tier="cheap").invoke(
             [
                 ("system", load_prompt("reviewer")),
                 (

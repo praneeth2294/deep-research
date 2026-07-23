@@ -163,7 +163,37 @@ and the revision path (reviewer rejects → writer revises) with faked LLMs/tool
 | `REVIEWER_PASS_SCORE` | `7` | Raise → stricter reviewer, more revisions |
 | `MAX_WRITER_REVISIONS` | `2` | Hard cap on the evaluator-optimiser loop |
 
-## Phase 3 — Router + Model Tiering *(arrives with sprint 03)*
+## Phase 3 — Router + Model Tiering
+
+Every topic is now triaged first; trivial questions take a cheap short path.
+Every run ends with a **cost summary** (total $ + per-model token breakdown).
+
+```bash
+uv run research "What does RAG stand for?"
+```
+
+→ `Route: simple_lookup` — one search + one cheap LLM call (~$0.002).
+
+```bash
+uv run research "Impact of the EU AI Act on early-stage startups"
+```
+
+→ full pipeline (~$0.026). The short path costs <10% of a deep run.
+
+### Fault-injection / budget tests (offline)
+
+```bash
+uv run pytest tests/unit/test_tiering.py -v
+```
+
+### New tuning knobs (.env)
+
+| Variable | Default | Effect |
+|---|---|---|
+| `CHEAP_FALLBACKS` | `gemini-3-flash-preview` | Comma-separated fallbacks when the cheap model fails (429/5xx/404) |
+| `STRONG_FALLBACKS` | `gemini-flash-latest` | Same for the strong tier |
+| `MAX_SESSION_BUDGET_USD` | `1.0` | Hard cap — LLM calls raise once estimated spend reaches it |
+| `REQUESTS_PER_MINUTE` | `30` | Shared rate limit across ALL model calls (lower it if you see 429s on free tier) |
 
 ## Phase 4 — ReAct Researchers + Tool Registry *(arrives with sprint 04)*
 
@@ -188,7 +218,7 @@ Will add: `docker compose up` (full stack) and the one-command demo.
 
 ---
 
-## Run the whole application (current state: Phase 2)
+## Run the whole application (current state: Phase 3)
 
 1. One-time setup (if not done): `uv sync`, copy `.env.example` → `.env`, fill
    `GOOGLE_API_KEY` + `TAVILY_API_KEY`.
@@ -198,14 +228,17 @@ Will add: `docker compose up` (full stack) and the one-command demo.
 uv run research "your research topic here"
 ```
 
-What happens: **planner** decomposes the topic into 1–3 sub-topics → **researchers
-run in parallel** (one per sub-topic, Send() fan-out) → **quality gate** (pure
-Python) scores each result's evidence; failing sub-topics go to the **replanner**
-for a revised query and one bounded re-research → **analyst** dedupes sources and
-extracts claims (with confidence + source numbers) → **synthesizer** cross-references
-claims and detects conflicts → **writer** drafts the cited report → **reviewer**
-scores it 0–10; below 7 it goes back to the writer with concrete issues (max 2
-revisions) → final report + sources printed.
+What happens: **router** (cheap LLM) triages the topic — trivial questions go
+straight to **simple_answer** (one search + one cited answer, done). Otherwise:
+**planner** decomposes the topic into 1–3 sub-topics → **researchers run in
+parallel** (Send() fan-out) → **quality gate** (pure Python) scores evidence;
+failing sub-topics go to the **replanner** for one bounded re-research →
+**analyst** dedupes sources and extracts claims → **synthesizer** cross-references
+and detects conflicts → **writer** drafts the cited report → **reviewer** scores
+0–10 with a bounded revision loop → report + sources + **cost summary** printed.
+
+Cross-cutting: all LLM calls flow through budget gate → fallback chain → shared
+rate limiter; the session stops cleanly if `MAX_SESSION_BUDGET_USD` is reached.
 
 This section is **updated every sprint**; by Phase 9 it will contain the full
 `docker compose up` → submit topic → approve plan → stream progress → read report

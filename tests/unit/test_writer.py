@@ -2,7 +2,7 @@
 
 from langchain_core.messages import AIMessage
 
-from deep_research.graph.nodes.writer import extract_text
+from deep_research.llm.content import extract_text
 
 
 def test_extract_text_plain_string() -> None:

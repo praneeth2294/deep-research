@@ -9,6 +9,8 @@ def test_graph_compiles_without_credentials() -> None:
     # build_graph performs no I/O; it must work on a machine with no .env at all.
     graph = build_graph()
     expected = {
+        "router",
+        "simple_answer",
         "planner",
         "researcher",
         "quality_gate",

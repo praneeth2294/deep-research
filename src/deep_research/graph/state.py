@@ -16,12 +16,15 @@ from deep_research.schemas.analysis import Claim, SynthesisOutput
 from deep_research.schemas.planner import SubTopic
 from deep_research.schemas.research import ResearchResult, Source
 from deep_research.schemas.review import ReviewVerdict
+from deep_research.schemas.routing import Route
 
 
 class ResearchState(TypedDict, total=False):
     """State flowing through the research graph."""
 
     topic: str
+    # triage verdict: simple_lookup takes the short path, others the full pipeline
+    route: Route
     sub_topics: list[SubTopic]
     # fan-in point: every parallel researcher appends exactly one result
     research_results: Annotated[list[ResearchResult], operator.add]

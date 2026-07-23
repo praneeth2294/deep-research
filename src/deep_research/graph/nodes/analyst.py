@@ -8,7 +8,7 @@ supporting source numbers) with the strong model.
 from typing import cast
 
 from deep_research.graph.state import ResearchState
-from deep_research.llm.tiering import strong_llm
+from deep_research.llm.tiering import structured_llm
 from deep_research.prompts import load_prompt
 from deep_research.schemas.analysis import ClaimSet
 from deep_research.schemas.research import Source
@@ -42,10 +42,9 @@ def analyst_node(state: ResearchState) -> ResearchState:
     sources = dedupe_sources(state)
     if not sources:
         return {"sources": [], "claims": []}
-    llm = strong_llm().with_structured_output(ClaimSet)
     claim_set = cast(
         ClaimSet,
-        llm.invoke(
+        structured_llm(ClaimSet, tier="strong").invoke(
             [
                 ("system", load_prompt("analyst")),
                 (

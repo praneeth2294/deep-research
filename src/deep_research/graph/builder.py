@@ -1,7 +1,10 @@
-"""Graph assembly — Phase 2 wiring.
+"""Graph assembly — Phase 3 wiring.
 
-                       Send() per sub-topic (parallel)
-    START -> planner ================================> researcher(s)
+    START -> router --simple_lookup--> simple_answer -> END
+                |
+                | deep_research / comparison
+                v          Send() per sub-topic (parallel)
+             planner ================================> researcher(s)
                                                             |
                                                             v   (fan-in)
               +--------------------------------------- quality_gate
@@ -31,9 +34,16 @@ from deep_research.graph.nodes.quality_gate import quality_gate_node
 from deep_research.graph.nodes.replanner import replanner_node
 from deep_research.graph.nodes.researcher import researcher_node
 from deep_research.graph.nodes.reviewer import reviewer_node
+from deep_research.graph.nodes.router import router_node
+from deep_research.graph.nodes.simple_answer import simple_answer_node
 from deep_research.graph.nodes.synthesizer import synthesizer_node
 from deep_research.graph.nodes.writer import writer_node
 from deep_research.graph.state import ResearchState
+
+
+def route_after_router(state: ResearchState) -> str:
+    """LLM-routing branch: trivial questions skip the whole pipeline."""
+    return "simple_answer" if state.get("route") == "simple_lookup" else "planner"
 
 
 def fan_out_researchers(state: ResearchState) -> list[Send]:
@@ -71,6 +81,8 @@ def route_after_review(state: ResearchState) -> str:
 def build_graph() -> CompiledStateGraph[ResearchState]:
     """Build and compile the research graph (no I/O happens until invoke)."""
     graph: StateGraph[ResearchState] = StateGraph(ResearchState)
+    graph.add_node("router", router_node)
+    graph.add_node("simple_answer", simple_answer_node)
     graph.add_node("planner", planner_node)
     graph.add_node("researcher", researcher_node)  # Send() delivers ResearcherInput payloads
     graph.add_node("quality_gate", quality_gate_node)
@@ -80,7 +92,9 @@ def build_graph() -> CompiledStateGraph[ResearchState]:
     graph.add_node("writer", writer_node)
     graph.add_node("reviewer", reviewer_node)
 
-    graph.add_edge(START, "planner")
+    graph.add_edge(START, "router")
+    graph.add_conditional_edges("router", route_after_router, ["simple_answer", "planner"])
+    graph.add_edge("simple_answer", END)
     graph.add_conditional_edges("planner", fan_out_researchers, ["researcher"])
     graph.add_edge("researcher", "quality_gate")
     graph.add_conditional_edges("quality_gate", route_after_gate, ["replanner", "analyst"])

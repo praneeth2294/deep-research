@@ -1,6 +1,6 @@
-"""End-to-end walking-skeleton test.
+"""End-to-end integration tests.
 
-Runs the REAL pipeline (Gemini + Tavily) — costs a few API calls.
+Run the REAL pipeline (Gemini + Tavily) — costs a few API calls.
 Skipped automatically when keys are absent (e.g. in CI).
 Run locally with:  uv run pytest tests/integration -s
 """
@@ -17,13 +17,27 @@ requires_keys = pytest.mark.skipif(
 
 
 @requires_keys
-def test_pipeline_produces_cited_report() -> None:
+def test_deep_pipeline_produces_cited_report() -> None:
     from deep_research.graph.builder import build_graph
 
-    result = build_graph().invoke({"topic": "What is LangGraph and what is it used for?"})
+    result = build_graph().invoke(
+        {"topic": "Compare LangGraph and CrewAI for building production multi-agent systems"}
+    )
 
+    assert result["route"] in ("deep_research", "comparison")
     assert 1 <= len(result["sub_topics"]) <= 3
     assert len(result["sources"]) >= 1
     report = result["report"]
     assert len(report) > 200
     assert "[1]" in report  # at least one inline citation
+
+
+@requires_keys
+def test_simple_lookup_short_path() -> None:
+    from deep_research.graph.builder import build_graph
+
+    result = build_graph().invoke({"topic": "What does RAG stand for in AI?"})
+
+    assert result["route"] == "simple_lookup"
+    assert "sub_topics" not in result  # planner never ran
+    assert len(result.get("report", "")) > 20

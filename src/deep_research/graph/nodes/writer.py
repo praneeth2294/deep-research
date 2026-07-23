@@ -6,31 +6,11 @@ again with the reviewer's issues as explicit revision instructions
 (incrementing `revision_count`, which bounds the loop).
 """
 
-from langchain_core.messages import BaseMessage
-
 from deep_research.graph.state import ResearchState
-from deep_research.llm.tiering import strong_llm
+from deep_research.llm.content import extract_text
+from deep_research.llm.tiering import text_llm
 from deep_research.prompts import load_prompt
 from deep_research.schemas.research import Source
-
-
-def extract_text(message: BaseMessage) -> str:
-    """Return only the text of a model response.
-
-    Gemini 3 returns `content` as a list of typed parts (text blocks plus
-    reasoning-signature blobs); older models return a plain string. Never
-    `str()` the raw content — normalize here.
-    """
-    content = message.content
-    if isinstance(content, str):
-        return content
-    parts: list[str] = []
-    for part in content:
-        if isinstance(part, str):
-            parts.append(part)
-        elif isinstance(part, dict) and part.get("type") == "text":
-            parts.append(str(part.get("text", "")))
-    return "\n".join(parts).strip()
 
 
 def format_sources(sources: list[Source]) -> str:
@@ -80,7 +60,7 @@ def writer_node(state: ResearchState) -> ResearchState:
     else:
         messages.append(("human", _build_brief(state)))
 
-    response = strong_llm(temperature=0.3).invoke(messages)
+    response = text_llm(tier="strong", temperature=0.3).invoke(messages)
     update: ResearchState = {"report": extract_text(response)}
     if is_revision:
         update["revision_count"] = state.get("revision_count", 0) + 1

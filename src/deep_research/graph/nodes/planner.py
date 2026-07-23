@@ -7,19 +7,22 @@ many researchers run (fan-out arrives in Phase 2).
 from typing import cast
 
 from deep_research.graph.state import ResearchState
-from deep_research.llm.tiering import cheap_llm
+from deep_research.llm.tiering import structured_llm
 from deep_research.prompts import load_prompt
 from deep_research.schemas.planner import PlannerOutput
 
 
 def planner_node(state: ResearchState) -> ResearchState:
-    llm = cheap_llm().with_structured_output(PlannerOutput)
     plan = cast(
         PlannerOutput,
-        llm.invoke(
+        structured_llm(PlannerOutput, tier="cheap").invoke(
             [
                 ("system", load_prompt("planner")),
-                ("human", f"Research topic: {state['topic']}"),
+                (
+                    "human",
+                    f"Research topic: {state['topic']}\n"
+                    f"Query type: {state.get('route', 'deep_research')}",
+                ),
             ]
         ),
     )

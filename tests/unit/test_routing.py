@@ -6,6 +6,7 @@ from deep_research.graph.builder import (
     fan_out_researchers,
     route_after_gate,
     route_after_review,
+    route_after_router,
 )
 from deep_research.schemas.planner import SubTopic
 from deep_research.schemas.review import ReviewVerdict
@@ -20,6 +21,13 @@ def test_fan_out_one_send_per_sub_topic() -> None:
     assert len(sends) == 3
     assert all(send.node == "researcher" for send in sends)
     assert all(send.arg["attempt"] == 1 for send in sends)
+
+
+def test_route_after_router() -> None:
+    assert route_after_router({"route": "simple_lookup"}) == "simple_answer"
+    assert route_after_router({"route": "deep_research"}) == "planner"
+    assert route_after_router({"route": "comparison"}) == "planner"
+    assert route_after_router({}) == "planner"  # missing route -> safe default
 
 
 def test_route_after_gate() -> None:

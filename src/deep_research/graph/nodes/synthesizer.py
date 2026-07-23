@@ -8,7 +8,7 @@ structured brief the writer works from.
 from typing import cast
 
 from deep_research.graph.state import ResearchState
-from deep_research.llm.tiering import strong_llm
+from deep_research.llm.tiering import structured_llm
 from deep_research.prompts import load_prompt
 from deep_research.schemas.analysis import SynthesisOutput
 
@@ -21,10 +21,9 @@ def _format_claims(state: ResearchState) -> str:
 
 
 def synthesizer_node(state: ResearchState) -> ResearchState:
-    llm = strong_llm().with_structured_output(SynthesisOutput)
     synthesis = cast(
         SynthesisOutput,
-        llm.invoke(
+        structured_llm(SynthesisOutput, tier="strong").invoke(
             [
                 ("system", load_prompt("synthesizer")),
                 (
