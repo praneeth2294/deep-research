@@ -10,6 +10,7 @@ def test_graph_compiles_without_credentials() -> None:
     graph = build_graph()
     expected = {
         "input_guard",
+        "hitl",
         "router",
         "simple_answer",
         "memory_recall",

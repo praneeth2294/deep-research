@@ -30,6 +30,7 @@ from langgraph.types import Send
 
 from deep_research.config import get_settings
 from deep_research.graph.nodes.analyst import analyst_node
+from deep_research.graph.nodes.hitl import hitl_node
 from deep_research.graph.nodes.input_guard import input_guard_node
 from deep_research.graph.nodes.memory_recall import memory_recall_node
 from deep_research.graph.nodes.memory_store import memory_store_node
@@ -63,6 +64,13 @@ def fan_out_researchers(state: ResearchState) -> list[Send]:
     ]
 
 
+def fan_out_after_hitl(state: ResearchState) -> list[Send] | str:
+    """After plan approval: cancelled runs end; approved/edited plans fan out."""
+    if state.get("refusal"):
+        return END
+    return fan_out_researchers(state)
+
+
 def route_after_gate(state: ResearchState) -> str:
     """Gate routing: replan failed sub-topics (bounded), else proceed to analysis."""
     return "replanner" if state.get("needs_replan") else "analyst"
@@ -89,11 +97,15 @@ def route_after_review(state: ResearchState) -> str:
 
 def build_graph(
     checkpointer: BaseCheckpointSaver[str] | None = None,
+    *,
+    hitl: bool = True,
 ) -> CompiledStateGraph[ResearchState]:
     """Build and compile the research graph (no I/O happens until invoke).
 
     Pass a checkpointer for durable execution: state persists after every
     superstep and a run can resume by thread_id after a crash.
+    `hitl=True` (default) pauses after planning for human plan approval —
+    requires a checkpointer at runtime. Tests of other paths pass hitl=False.
     """
     graph: StateGraph[ResearchState] = StateGraph(ResearchState)
     graph.add_node("input_guard", input_guard_node)
@@ -115,7 +127,12 @@ def build_graph(
     graph.add_conditional_edges("router", route_after_router, ["simple_answer", "memory_recall"])
     graph.add_edge("simple_answer", END)
     graph.add_edge("memory_recall", "planner")
-    graph.add_conditional_edges("planner", fan_out_researchers, ["researcher"])
+    if hitl:
+        graph.add_node("hitl", hitl_node)
+        graph.add_edge("planner", "hitl")
+        graph.add_conditional_edges("hitl", fan_out_after_hitl, ["researcher", END])
+    else:
+        graph.add_conditional_edges("planner", fan_out_researchers, ["researcher"])
     graph.add_edge("researcher", "quality_gate")
     graph.add_conditional_edges("quality_gate", route_after_gate, ["replanner", "analyst"])
     graph.add_conditional_edges("replanner", fan_out_replanned, ["researcher"])

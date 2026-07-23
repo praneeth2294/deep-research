@@ -43,9 +43,36 @@ def _print_partial(graph: object, config: object) -> None:
         print("  draft report: present (awaiting review)")
 
 
-def _run(topic: str | None, thread: str | None) -> None:
+def _plan_decision(payload: dict[str, object], auto_approve: bool) -> dict[str, object]:
+    """Show the plan and collect the human decision (or auto-approve)."""
+    sub_topics = payload.get("sub_topics", [])
+    print("\nPlan awaiting approval:")
+    if isinstance(sub_topics, list):
+        for i, st in enumerate(sub_topics, start=1):
+            if isinstance(st, dict):
+                print(f"  {i}. {st.get('title')}  [query: {st.get('search_query')}]")
+    if auto_approve or not sys.stdin.isatty():
+        print("Auto-approving plan.")
+        return {"decision": "approve"}
+    choice = input("Approve [a] / Edit queries [e] / Cancel [c]? ").strip().lower()
+    if choice == "c":
+        return {"decision": "cancel"}
+    if choice == "e" and isinstance(sub_topics, list):
+        edited: list[dict[str, object]] = []
+        for st in sub_topics:
+            if not isinstance(st, dict):
+                continue
+            new_query = input(f"  Query for '{st.get('title')}' (enter = keep): ").strip()
+            edited.append({**st, "search_query": new_query or st.get("search_query")})
+        return {"decision": "edit", "sub_topics": edited}
+    return {"decision": "approve"}
+
+
+def _run(topic: str | None, thread: str | None, auto_approve: bool = False) -> None:
     # Imported lazily so `research` (smoke check) works without heavy deps loading.
     from uuid import uuid4
+
+    from langgraph.types import Command
 
     from deep_research.graph.builder import build_graph
     from deep_research.guardrails.budget import BudgetExceededError
@@ -72,6 +99,11 @@ def _run(topic: str | None, thread: str | None) -> None:
     )
     try:
         result = graph.invoke(cast("Any", payload), config=config)
+        # Human-in-the-loop: the graph pauses at plan approval; loop until done.
+        while "__interrupt__" in result:
+            intr = result["__interrupt__"][0]
+            decision = _plan_decision(dict(intr.value), auto_approve)
+            result = graph.invoke(Command(resume=decision), config=config)
     except BudgetExceededError as exc:
         print(f"STOPPED: {exc}\n")
         _print_partial(graph, config)
@@ -148,9 +180,14 @@ def main() -> None:
         default=None,
         help="Resume a previous run from its checkpoint (thread id printed at start)",
     )
+    parser.add_argument(
+        "--auto-approve",
+        action="store_true",
+        help="Skip the plan-approval prompt (for demos/scripts)",
+    )
     args = parser.parse_args()
     if args.topic or args.thread:
-        _run(args.topic, args.thread)
+        _run(args.topic, args.thread, auto_approve=args.auto_approve)
     else:
         _smoke_check()
 

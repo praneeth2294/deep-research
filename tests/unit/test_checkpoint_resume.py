@@ -111,7 +111,7 @@ def test_crash_then_resume_from_checkpoint(monkeypatch: pytest.MonkeyPatch) -> N
     monkeypatch.setattr(writer_node_mod, "text_llm", crashing_writer)
 
     saver = SqliteSaver(sqlite3.connect(":memory:", check_same_thread=False))
-    graph = builder.build_graph(checkpointer=saver)
+    graph = builder.build_graph(checkpointer=saver, hitl=False)  # crash-resume focus
     config = cast("Any", {"configurable": {"thread_id": "resume-test"}})
 
     with pytest.raises(RuntimeError, match="process killed"):

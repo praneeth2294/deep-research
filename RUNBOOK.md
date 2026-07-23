@@ -319,10 +319,61 @@ uv run pytest tests/unit/test_pii.py tests/unit/test_input_guard.py tests/unit/t
 |---|---|---|
 | `BLOCKED_DOMAINS` | *(empty)* | Comma-separated domains to refuse everywhere (suffix match), e.g. `pinterest.com, quora.com` |
 
-## Phase 7 — HITL + API *(arrives with sprint 07)*
+## Phase 7 — HITL + API
 
-Will add: `uv run uvicorn deep_research.api.app:app` and the HTTP flow
-(submit → approve plan → stream → report).
+### CLI with plan approval
+
+Deep runs now pause after planning. Interactive prompt: `[a]pprove / [e]dit /
+[c]ancel` (edit lets you rewrite each search query). For scripts/demos:
+
+```bash
+uv run research "Trends in AI agent observability tooling" --auto-approve
+```
+
+Non-interactive shells (pipes, CI) auto-approve automatically.
+
+### API server
+
+```bash
+uv run uvicorn deep_research.api.app:app --port 8000
+```
+
+Full HTTP walkthrough:
+
+```bash
+curl -s -X POST localhost:8000/research -H "Content-Type: application/json" -d "{\"topic\": \"Impact of the EU AI Act on startups\"}"
+```
+
+→ `{"thread_id": "abc123...", "status": "running"}` — poll until awaiting approval:
+
+```bash
+curl -s localhost:8000/research/abc123
+```
+
+→ shows `"status": "awaiting_approval"` and the `plan`. Approve (or edit/cancel):
+
+```bash
+curl -s -X POST localhost:8000/research/abc123/approve -H "Content-Type: application/json" -d "{\"decision\": \"approve\"}"
+```
+
+Stream progress (SSE — one `node_completed` event per node, ends with `[DONE]`):
+
+```bash
+curl -N localhost:8000/research/abc123/stream
+```
+
+When `"status": "done"`, the same GET returns `result` (report, sources, review
+score, cost). Leave feedback:
+
+```bash
+curl -s -X POST localhost:8000/feedback -H "Content-Type: application/json" -d "{\"thread_id\": \"abc123\", \"rating\": \"up\", \"comment\": \"solid report\"}"
+```
+
+### HITL + API test suites (offline)
+
+```bash
+uv run pytest tests/unit/test_hitl.py tests/unit/test_api.py -v
+```
 
 ## Phase 8 — Observability + Evals *(arrives with sprint 08)*
 
@@ -334,7 +385,10 @@ Will add: `docker compose up` (full stack) and the one-command demo.
 
 ---
 
-## Run the whole application (current state: Phase 6)
+## Run the whole application (current state: Phase 7)
+
+Two ways to run: the CLI (below) or the HTTP API (see Phase 7 section for the
+full curl walkthrough — submit, approve the plan, stream progress, feedback).
 
 1. One-time setup (if not done): `uv sync`, copy `.env.example` → `.env`, fill
    `GOOGLE_API_KEY` + `TAVILY_API_KEY`.
@@ -349,7 +403,9 @@ with an explanation and scrubs PII before anything reaches a third party →
 **router** (cheap LLM) triages the topic — trivial questions go
 straight to **simple_answer** (one search + one cited answer, done). Otherwise:
 **memory_recall** checks episodic memory for related past sessions (seeds the
-planner) → **planner** decomposes the topic into 1–3 sub-topics → **researchers
+planner) → **planner** decomposes the topic into 1–3 sub-topics → **the run
+pauses for plan approval** (approve/edit/cancel — interactive in the CLI, via
+`/approve` in the API, or `--auto-approve`) → **researchers
 run in parallel as bounded ReAct agents** (seeded search, then up to N
 self-chosen tavily/wikipedia/fetch_url/**semantic_search** calls) → **quality
 gate** scores evidence; failing sub-topics go to the **replanner** for one

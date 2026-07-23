@@ -160,7 +160,9 @@ def test_full_flow_with_replan_and_revision(monkeypatch: pytest.MonkeyPatch) -> 
         ),
     )
 
-    result = builder.build_graph().invoke({"topic": "What is LangGraph?"})
+    # hitl=False: this test exercises the research pipeline, not the approval gate
+    # (which has its own dedicated tests in test_hitl.py).
+    result = builder.build_graph(hitl=False).invoke({"topic": "What is LangGraph?"})
 
     assert result["route"] == "deep_research"
     results = result["research_results"]
