@@ -54,6 +54,17 @@ class Settings(BaseSettings):
     max_writer_revisions: int = Field(default=2, ge=0, le=5)
     requests_per_minute: int = Field(default=30, ge=1)
 
+    # --- Quality thresholds -------------------------------------------------
+    gate_quality_threshold: float = Field(
+        default=0.4,
+        ge=0.0,
+        le=1.0,
+        description="Research results scoring below this are sent back for replanning.",
+    )
+    reviewer_pass_score: int = Field(
+        default=7, ge=0, le=10, description="Reports scoring >= this are accepted."
+    )
+
 
 @lru_cache
 def get_settings() -> Settings:

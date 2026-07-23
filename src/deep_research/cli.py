@@ -32,6 +32,15 @@ def _run(topic: str) -> None:
     for sub_topic in sub_topics:
         print(f"  - {sub_topic.title}  [query: {sub_topic.search_query}]")
 
+    replanned = [r for r in result.get("research_results", []) if r.attempt >= 2]
+    if replanned:
+        titles = ", ".join(r.sub_topic.title for r in replanned)
+        print(f"Replanned after quality gate: {titles}")
+    review = result.get("review")
+    if review is not None:
+        revisions = result.get("revision_count", 0)
+        print(f"Review: {review.score}/10 after {revisions} revision(s)")
+
     print("\n" + "=" * 72)
     print(result.get("report", "(no report produced)"))
     print("=" * 72 + "\nSources:")

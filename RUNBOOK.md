@@ -134,7 +134,34 @@ List models your key can use:
 uv run python -c "from deep_research.net import setup_tls; setup_tls(); from deep_research.config import get_settings; from google import genai; [print(m.name) for m in genai.Client(api_key=get_settings().google_api_key.get_secret_value()).models.list() if 'generateContent' in (m.supported_actions or [])]"
 ```
 
-## Phase 2 — Core Patterns *(arrives with sprint 02)*
+## Phase 2 — Core Patterns
+
+Same entry point as Phase 1 — the pipeline underneath got the full pattern set
+(parallel researchers, quality gate, replanner, analyst → synthesizer, reviewer loop):
+
+```bash
+uv run research "Compare Qdrant and Chroma for production vector search"
+```
+
+The CLI now also prints: which sub-topics were **replanned** after the quality
+gate, and the **review score** with the number of revisions.
+
+### Run the offline full-graph flow test (no API keys, no cost)
+
+```bash
+uv run pytest tests/unit/test_graph_flow.py -v
+```
+
+This forces the gate-failure path (junk sources → replanner → attempt-2 research)
+and the revision path (reviewer rejects → writer revises) with faked LLMs/tools.
+
+### Tune the quality knobs (optional, via .env)
+
+| Variable | Default | Effect |
+|---|---|---|
+| `GATE_QUALITY_THRESHOLD` | `0.4` | Raise → more replanning, higher evidence bar |
+| `REVIEWER_PASS_SCORE` | `7` | Raise → stricter reviewer, more revisions |
+| `MAX_WRITER_REVISIONS` | `2` | Hard cap on the evaluator-optimiser loop |
 
 ## Phase 3 — Router + Model Tiering *(arrives with sprint 03)*
 
@@ -161,7 +188,7 @@ Will add: `docker compose up` (full stack) and the one-command demo.
 
 ---
 
-## Run the whole application (current state: Phase 1)
+## Run the whole application (current state: Phase 2)
 
 1. One-time setup (if not done): `uv sync`, copy `.env.example` → `.env`, fill
    `GOOGLE_API_KEY` + `TAVILY_API_KEY`.
@@ -171,10 +198,14 @@ Will add: `docker compose up` (full stack) and the one-command demo.
 uv run research "your research topic here"
 ```
 
-What happens: **planner** (Gemini, structured output) decomposes the topic into 1–3
-sub-topics with search queries → **researcher** runs each query against Tavily →
-**writer** (Gemini) produces a 200–400 word report where every claim carries an
-inline `[n]` citation, followed by the numbered source list.
+What happens: **planner** decomposes the topic into 1–3 sub-topics → **researchers
+run in parallel** (one per sub-topic, Send() fan-out) → **quality gate** (pure
+Python) scores each result's evidence; failing sub-topics go to the **replanner**
+for a revised query and one bounded re-research → **analyst** dedupes sources and
+extracts claims (with confidence + source numbers) → **synthesizer** cross-references
+claims and detects conflicts → **writer** drafts the cited report → **reviewer**
+scores it 0–10; below 7 it goes back to the writer with concrete issues (max 2
+revisions) → final report + sources printed.
 
 This section is **updated every sprint**; by Phase 9 it will contain the full
 `docker compose up` → submit topic → approve plan → stream progress → read report

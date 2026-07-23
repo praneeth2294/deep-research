@@ -1,13 +1,15 @@
-"""Writer node — produce the cited report from collected sources.
+"""Writer node — produce (and revise) the cited report.
 
-Prompt-chaining step: consumes the researcher's sources, emits prose whose
-every claim carries an inline [n] citation resolvable against the source list.
+The generator half of the Evaluator-Optimiser loop: the first run drafts the
+report from the synthesis; when the reviewer rejects a draft, this node runs
+again with the reviewer's issues as explicit revision instructions
+(incrementing `revision_count`, which bounds the loop).
 """
 
 from langchain_core.messages import BaseMessage
 
 from deep_research.graph.state import ResearchState
-from deep_research.llm.tiering import cheap_llm
+from deep_research.llm.tiering import strong_llm
 from deep_research.prompts import load_prompt
 from deep_research.schemas.research import Source
 
@@ -40,17 +42,46 @@ def format_sources(sources: list[Source]) -> str:
     return "\n\n".join(lines)
 
 
+def _build_brief(state: ResearchState) -> str:
+    synthesis = state.get("synthesis")
+    sources = state.get("sources", [])
+    parts = [f"Topic: {state['topic']}"]
+    if synthesis is not None:
+        parts.append(f"Synthesis:\n{synthesis.summary}")
+        parts.append("Key findings:\n" + "\n".join(f"- {kf}" for kf in synthesis.key_findings))
+        if synthesis.conflicts:
+            parts.append(
+                "Conflicts to surface explicitly:\n"
+                + "\n".join(f"- {c}" for c in synthesis.conflicts)
+            )
+    parts.append(f"Numbered sources:\n\n{format_sources(sources)}")
+    return "\n\n".join(parts)
+
+
 def writer_node(state: ResearchState) -> ResearchState:
     sources = state.get("sources", [])
     if not sources:
         return {"report": "No sources were found for this topic; cannot write a grounded report."}
-    response = cheap_llm(temperature=0.3).invoke(
-        [
-            ("system", load_prompt("writer")),
+
+    messages: list[tuple[str, str]] = [("system", load_prompt("writer"))]
+    review = state.get("review")
+    is_revision = review is not None and bool(state.get("report"))
+    if is_revision and review is not None:
+        issues = "\n".join(f"- {issue}" for issue in review.issues) or "- (no specific issues)"
+        messages.append(
             (
                 "human",
-                f"Topic: {state['topic']}\n\nNumbered sources:\n\n{format_sources(sources)}",
-            ),
-        ]
-    )
-    return {"report": extract_text(response)}
+                f"{_build_brief(state)}\n\n"
+                f"Your previous draft:\n{state['report']}\n\n"
+                f"A reviewer scored it {review.score}/10 and requires these fixes:\n{issues}\n\n"
+                "Rewrite the report addressing every issue. Keep what was good.",
+            )
+        )
+    else:
+        messages.append(("human", _build_brief(state)))
+
+    response = strong_llm(temperature=0.3).invoke(messages)
+    update: ResearchState = {"report": extract_text(response)}
+    if is_revision:
+        update["revision_count"] = state.get("revision_count", 0) + 1
+    return update

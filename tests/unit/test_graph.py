@@ -8,7 +8,17 @@ from deep_research.schemas.research import Source
 def test_graph_compiles_without_credentials() -> None:
     # build_graph performs no I/O; it must work on a machine with no .env at all.
     graph = build_graph()
-    assert {"planner", "researcher", "writer"} <= set(graph.get_graph().nodes)
+    expected = {
+        "planner",
+        "researcher",
+        "quality_gate",
+        "replanner",
+        "analyst",
+        "synthesizer",
+        "writer",
+        "reviewer",
+    }
+    assert expected <= set(graph.get_graph().nodes)
 
 
 def test_format_sources_numbers_from_one() -> None:
