@@ -23,6 +23,10 @@ class ResearchState(TypedDict, total=False):
     """State flowing through the research graph."""
 
     topic: str
+    # set by the input guard when the run is refused (explanation for the user)
+    refusal: str
+    # what the input guard changed (e.g. PII kinds scrubbed from the topic)
+    input_notes: list[str]
     # triage verdict: simple_lookup takes the short path, others the full pipeline
     route: Route
     # related past sessions from episodic memory (empty string when none)

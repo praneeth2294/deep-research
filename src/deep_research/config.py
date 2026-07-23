@@ -94,6 +94,12 @@ class Settings(BaseSettings):
         description="SQLite file for durable graph checkpoints (resume by thread id).",
     )
 
+    # --- Guardrails (Phase 6) ----------------------------------------------
+    blocked_domains: str = Field(
+        default="",
+        description="Comma-separated domains to refuse (suffix match), e.g. 'example.com'.",
+    )
+
     # --- Quality thresholds -------------------------------------------------
     gate_quality_threshold: float = Field(
         default=0.4,

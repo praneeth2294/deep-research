@@ -92,8 +92,11 @@ def _extract_text(html: str) -> tuple[str, str]:
 
 def fetch_url(url: str) -> list[Source]:
     """Fetch one page and return it as a single high-detail source."""
+    from deep_research.guardrails.url_policy import check as policy_check
+
     url = url.strip()
-    domain = _check_url_allowed(url)
+    policy_check(url)  # operator policy (ports, credentials, blocked domains)
+    domain = _check_url_allowed(url)  # SSRF classes (private/reserved IPs)
     _check_breaker(domain)
     try:
         html = _fetch_html(url)

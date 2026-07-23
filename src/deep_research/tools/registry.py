@@ -13,6 +13,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from deep_research.guardrails.injection import sanitize_text
+from deep_research.guardrails.url_policy import evaluate as url_allowed
 from deep_research.schemas.research import Source
 from deep_research.tools.scraper import fetch_url
 from deep_research.tools.semantic_search import search_memory
@@ -31,7 +32,12 @@ class ToolSpec:
     run: ToolFn
 
 
-def _sanitized(run: ToolFn) -> ToolFn:
+def _guarded(run: ToolFn) -> ToolFn:
+    """Registry choke point: URL policy filter + injection sanitization.
+
+    Applied to every tool uniformly — a new tool cannot forget either guard.
+    """
+
     def wrapper(argument: str) -> list[Source]:
         return [
             source.model_copy(
@@ -41,9 +47,14 @@ def _sanitized(run: ToolFn) -> ToolFn:
                 }
             )
             for source in run(argument)
+            if url_allowed(source.url)[0]
         ]
 
     return wrapper
+
+
+# Backwards-compatible alias (tests and older call sites).
+_sanitized = _guarded
 
 
 _REGISTRY: dict[str, ToolSpec] = {
@@ -55,7 +66,7 @@ _REGISTRY: dict[str, ToolSpec] = {
                 "Web search. Input: a search query. Returns titles, URLs and text "
                 "snippets from across the web. Best first move for any sub-topic."
             ),
-            run=_sanitized(search_web),
+            run=_guarded(search_web),
         ),
         ToolSpec(
             name="wikipedia",
@@ -63,7 +74,7 @@ _REGISTRY: dict[str, ToolSpec] = {
                 "Wikipedia search. Input: a topic or entity name. Returns encyclopedic "
                 "articles. Best for definitions, background and established facts."
             ),
-            run=_sanitized(search_wikipedia),
+            run=_guarded(search_wikipedia),
         ),
         ToolSpec(
             name="fetch_url",
@@ -72,7 +83,7 @@ _REGISTRY: dict[str, ToolSpec] = {
                 "already seen in earlier results. Returns the page's readable text — "
                 "use when a snippet looks promising but is too thin to cite."
             ),
-            run=_sanitized(fetch_url),
+            run=_guarded(fetch_url),
         ),
         ToolSpec(
             name="semantic_search",
@@ -81,7 +92,7 @@ _REGISTRY: dict[str, ToolSpec] = {
                 "sessions. Instant and free — try it first when the sub-topic may "
                 "overlap earlier work; fall back to web search if it returns little."
             ),
-            run=_sanitized(search_memory),
+            run=_guarded(search_memory),
         ),
     ]
 }

@@ -20,6 +20,29 @@ def _smoke_check() -> None:
     print('Run:  research "your topic"')
 
 
+def _print_partial(graph: object, config: object) -> None:
+    """Partial-results report from the checkpoint (what a stopped run already has)."""
+    from typing import Any, cast
+
+    try:
+        snapshot = cast("Any", graph).get_state(cast("Any", config))
+        state = snapshot.values or {}
+    except Exception:
+        print("(no checkpointed progress found)")
+        return
+    sub_topics = state.get("sub_topics") or []
+    results = state.get("research_results") or []
+    print("Partial progress so far:")
+    print(f"  route: {state.get('route', '(not decided)')}")
+    if sub_topics:
+        print(f"  plan: {len(sub_topics)} sub-topic(s): " + "; ".join(s.title for s in sub_topics))
+    if results:
+        total = sum(len(r.sources) for r in results)
+        print(f"  research: {len(results)} result(s), {total} sources gathered")
+    if state.get("report"):
+        print("  draft report: present (awaiting review)")
+
+
 def _run(topic: str | None, thread: str | None) -> None:
     # Imported lazily so `research` (smoke check) works without heavy deps loading.
     from uuid import uuid4
@@ -50,10 +73,18 @@ def _run(topic: str | None, thread: str | None) -> None:
     try:
         result = graph.invoke(cast("Any", payload), config=config)
     except BudgetExceededError as exc:
-        print(f"STOPPED: {exc}")
-        print(f"Partial progress is checkpointed - resume with: research --thread {thread_id}")
+        print(f"STOPPED: {exc}\n")
+        _print_partial(graph, config)
+        print(f"\nResume once ready with: research --thread {thread_id}")
         print(session_cost.summary())
         return
+
+    if result.get("refusal"):
+        print("REFUSED:")
+        print(result["refusal"])
+        return
+    for note in result.get("input_notes", []):
+        print(f"Note: {note}")
 
     if result.get("prior_context"):
         print("Episodic memory recalled related past research:")

@@ -1,8 +1,11 @@
 """Routing functions: the graph's control flow, tested as plain functions."""
 
+from langgraph.graph import END
+
 from deep_research.graph.builder import (
     fan_out_researchers,
     route_after_gate,
+    route_after_input_guard,
     route_after_review,
     route_after_router,
 )
@@ -19,6 +22,11 @@ def test_fan_out_one_send_per_sub_topic() -> None:
     assert len(sends) == 3
     assert all(send.node == "researcher" for send in sends)
     assert all(send.arg["attempt"] == 1 for send in sends)
+
+
+def test_route_after_input_guard() -> None:
+    assert route_after_input_guard({"refusal": "nope"}) == END
+    assert route_after_input_guard({}) == "router"
 
 
 def test_route_after_router() -> None:

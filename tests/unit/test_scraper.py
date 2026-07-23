@@ -13,8 +13,8 @@ def _reset_breaker() -> None:
 @pytest.mark.parametrize(
     "url",
     [
-        "ftp://example.com/file",
-        "file:///etc/passwd",
+        "ftp://example.com/file",  # caught by the policy layer (scheme)
+        "file:///etc/passwd",  # caught by the policy layer (scheme)
         "http://localhost/admin",
         "http://127.0.0.1:8080/",
         "http://192.168.1.1/router",
@@ -24,7 +24,11 @@ def _reset_breaker() -> None:
     ],
 )
 def test_ssrf_policy_blocks(url: str) -> None:
-    with pytest.raises(scraper.BlockedUrlError):
+    # Two guard layers run in sequence: URL policy (schemes/ports/credentials),
+    # then the SSRF class check (private/reserved IPs). Either may refuse.
+    from deep_research.guardrails.url_policy import PolicyViolationError
+
+    with pytest.raises((scraper.BlockedUrlError, PolicyViolationError)):
         scraper.fetch_url(url)
 
 

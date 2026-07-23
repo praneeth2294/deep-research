@@ -30,6 +30,7 @@ from langgraph.types import Send
 
 from deep_research.config import get_settings
 from deep_research.graph.nodes.analyst import analyst_node
+from deep_research.graph.nodes.input_guard import input_guard_node
 from deep_research.graph.nodes.memory_recall import memory_recall_node
 from deep_research.graph.nodes.memory_store import memory_store_node
 from deep_research.graph.nodes.planner import planner_node
@@ -42,6 +43,11 @@ from deep_research.graph.nodes.simple_answer import simple_answer_node
 from deep_research.graph.nodes.synthesizer import synthesizer_node
 from deep_research.graph.nodes.writer import writer_node
 from deep_research.graph.state import ResearchState
+
+
+def route_after_input_guard(state: ResearchState) -> str:
+    """Refused input ends the run before any LLM call is made."""
+    return END if state.get("refusal") else "router"
 
 
 def route_after_router(state: ResearchState) -> str:
@@ -90,6 +96,7 @@ def build_graph(
     superstep and a run can resume by thread_id after a crash.
     """
     graph: StateGraph[ResearchState] = StateGraph(ResearchState)
+    graph.add_node("input_guard", input_guard_node)
     graph.add_node("router", router_node)
     graph.add_node("simple_answer", simple_answer_node)
     graph.add_node("memory_recall", memory_recall_node)
@@ -103,7 +110,8 @@ def build_graph(
     graph.add_node("writer", writer_node)
     graph.add_node("reviewer", reviewer_node)
 
-    graph.add_edge(START, "router")
+    graph.add_edge(START, "input_guard")
+    graph.add_conditional_edges("input_guard", route_after_input_guard, ["router", END])
     graph.add_conditional_edges("router", route_after_router, ["simple_answer", "memory_recall"])
     graph.add_edge("simple_answer", END)
     graph.add_edge("memory_recall", "planner")
