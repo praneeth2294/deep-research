@@ -88,10 +88,51 @@ uv add <package>
 
 ---
 
-## Phase 1 — Walking Skeleton *(arrives with sprint 01)*
+## Phase 1 — Walking Skeleton
 
-Will add: `uv run research "your topic"` — first real end-to-end run
-(requires `GOOGLE_API_KEY`, `TAVILY_API_KEY` in `.env`).
+Requires `GOOGLE_API_KEY` and `TAVILY_API_KEY` in `.env` (see Phase 0 setup).
+
+### Run a research topic (full pipeline: plan → search → cited report)
+
+```bash
+uv run research "impact of the EU AI Act on startups"
+```
+
+### Config smoke check (shows whether keys are detected)
+
+```bash
+uv run research
+```
+
+### Tests
+
+```bash
+uv run pytest tests/unit
+```
+
+(offline, free, runs in CI)
+
+```bash
+uv run pytest tests/integration -s
+```
+
+(real Gemini + Tavily calls — costs a few API requests; auto-skips if keys missing)
+
+### Troubleshooting
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `CERTIFICATE_VERIFY_FAILED` | Corporate TLS proxy (Zscaler etc.) | Already handled by `setup_tls()`; if it recurs in new entry points, call `deep_research.net.setup_tls()` first |
+| `404 model ... not available` | Google retired the model name | List available models: see command below; update `CHEAP_MODEL` in `.env` |
+| `503 high demand` | Model overloaded | Transient — retry; or switch `CHEAP_MODEL` to another flash model |
+| `429 RESOURCE_EXHAUSTED` on pro models | Free-tier keys have no pro quota | Keep a flash model in `STRONG_MODEL`, or upgrade to a paid key |
+| Garbled characters in console | Legacy Windows codepage | Already handled (CLI forces UTF-8) |
+
+List models your key can use:
+
+```bash
+uv run python -c "from deep_research.net import setup_tls; setup_tls(); from deep_research.config import get_settings; from google import genai; [print(m.name) for m in genai.Client(api_key=get_settings().google_api_key.get_secret_value()).models.list() if 'generateContent' in (m.supported_actions or [])]"
+```
 
 ## Phase 2 — Core Patterns *(arrives with sprint 02)*
 
@@ -120,13 +161,20 @@ Will add: `docker compose up` (full stack) and the one-command demo.
 
 ---
 
-## Run the whole application (current state)
+## Run the whole application (current state: Phase 1)
 
-The pipeline does not exist yet — Phase 0 is scaffolding only. Today, "the app" is:
+1. One-time setup (if not done): `uv sync`, copy `.env.example` → `.env`, fill
+   `GOOGLE_API_KEY` + `TAVILY_API_KEY`.
+2. Run:
 
 ```bash
-uv run research
+uv run research "your research topic here"
 ```
+
+What happens: **planner** (Gemini, structured output) decomposes the topic into 1–3
+sub-topics with search queries → **researcher** runs each query against Tavily →
+**writer** (Gemini) produces a 200–400 word report where every claim carries an
+inline `[n]` citation, followed by the numbered source list.
 
 This section is **updated every sprint**; by Phase 9 it will contain the full
 `docker compose up` → submit topic → approve plan → stream progress → read report

@@ -32,12 +32,16 @@ class Settings(BaseSettings):
 
     # --- Model tiering (Phase 3 wires these into real clients) -------------
     cheap_model: str = Field(
-        default="gemini-2.5-flash",
+        default="gemini-flash-latest",
         description="Fast/cheap model: router, planner, reviewer, gate-adjacent tasks.",
     )
     strong_model: str = Field(
-        default="gemini-2.5-pro",
-        description="Strong model: analyst, synthesizer, writer.",
+        default="gemini-3-flash-preview",
+        description=(
+            "Strong model: analyst, synthesizer, writer. Free-tier keys have no quota "
+            "for the pro models (429), so default to a capable flash; override via "
+            "STRONG_MODEL when using a paid key."
+        ),
     )
 
     # --- API keys (optional at import time; call sites fail fast) ----------
