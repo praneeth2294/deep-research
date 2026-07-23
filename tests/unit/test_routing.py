@@ -1,7 +1,5 @@
 """Routing functions: the graph's control flow, tested as plain functions."""
 
-from langgraph.graph import END
-
 from deep_research.graph.builder import (
     fan_out_researchers,
     route_after_gate,
@@ -25,9 +23,9 @@ def test_fan_out_one_send_per_sub_topic() -> None:
 
 def test_route_after_router() -> None:
     assert route_after_router({"route": "simple_lookup"}) == "simple_answer"
-    assert route_after_router({"route": "deep_research"}) == "planner"
-    assert route_after_router({"route": "comparison"}) == "planner"
-    assert route_after_router({}) == "planner"  # missing route -> safe default
+    assert route_after_router({"route": "deep_research"}) == "memory_recall"
+    assert route_after_router({"route": "comparison"}) == "memory_recall"
+    assert route_after_router({}) == "memory_recall"  # missing route -> safe default
 
 
 def test_route_after_gate() -> None:
@@ -38,7 +36,7 @@ def test_route_after_gate() -> None:
 
 def test_route_after_review_accepts_passing_score() -> None:
     state = {"review": ReviewVerdict(score=8, issues=[]), "revision_count": 0}
-    assert route_after_review(state) == END  # type: ignore[arg-type]
+    assert route_after_review(state) == "memory_store"  # type: ignore[arg-type]
 
 
 def test_route_after_review_sends_back_for_revision() -> None:
@@ -47,6 +45,6 @@ def test_route_after_review_sends_back_for_revision() -> None:
 
 
 def test_route_after_review_stops_when_budget_exhausted() -> None:
-    # default max_writer_revisions = 2
+    # default max_writer_revisions = 2 -> accept best effort, still write memory
     state = {"review": ReviewVerdict(score=5, issues=["fix X"]), "revision_count": 2}
-    assert route_after_review(state) == END  # type: ignore[arg-type]
+    assert route_after_review(state) == "memory_store"  # type: ignore[arg-type]

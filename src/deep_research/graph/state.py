@@ -25,6 +25,8 @@ class ResearchState(TypedDict, total=False):
     topic: str
     # triage verdict: simple_lookup takes the short path, others the full pipeline
     route: Route
+    # related past sessions from episodic memory (empty string when none)
+    prior_context: str
     sub_topics: list[SubTopic]
     # fan-in point: every parallel researcher appends exactly one result
     research_results: Annotated[list[ResearchResult], operator.add]

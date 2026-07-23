@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from deep_research.guardrails.injection import sanitize_text
 from deep_research.schemas.research import Source
 from deep_research.tools.scraper import fetch_url
+from deep_research.tools.semantic_search import search_memory
 from deep_research.tools.tavily_search import search_web
 from deep_research.tools.wikipedia import search_wikipedia
 
@@ -72,6 +73,15 @@ _REGISTRY: dict[str, ToolSpec] = {
                 "use when a snippet looks promising but is too thin to cite."
             ),
             run=_sanitized(fetch_url),
+        ),
+        ToolSpec(
+            name="semantic_search",
+            description=(
+                "Search this system's own memory of sources gathered in past research "
+                "sessions. Instant and free — try it first when the sub-topic may "
+                "overlap earlier work; fall back to web search if it returns little."
+            ),
+            run=_sanitized(search_memory),
         ),
     ]
 }

@@ -11,6 +11,8 @@ def test_graph_compiles_without_credentials() -> None:
     expected = {
         "router",
         "simple_answer",
+        "memory_recall",
+        "memory_store",
         "planner",
         "researcher",
         "quality_gate",

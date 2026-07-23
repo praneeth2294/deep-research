@@ -5,9 +5,11 @@ description = "Production-grade deep research agent - LangGraph multi-agent syst
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "chromadb>=1.5.9",
     "httpx>=0.28.1",
     "langchain-google-genai>=4.3.1",
     "langgraph>=1.2.9",
+    "langgraph-checkpoint-sqlite>=3.1.0",
     "pydantic>=2.7",
     "pydantic-settings>=2.2",
     "selectolax>=0.4.11",
@@ -62,7 +64,7 @@ files = ["src", "tests"]
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["tavily.*"]
+module = ["tavily.*", "chromadb.*"]
 ignore_missing_imports = true
 
 # --------------------------------------------------------------------------

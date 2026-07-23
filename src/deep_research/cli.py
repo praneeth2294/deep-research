@@ -20,21 +20,44 @@ def _smoke_check() -> None:
     print('Run:  research "your topic"')
 
 
-def _run(topic: str) -> None:
+def _run(topic: str | None, thread: str | None) -> None:
     # Imported lazily so `research` (smoke check) works without heavy deps loading.
+    from uuid import uuid4
+
     from deep_research.graph.builder import build_graph
     from deep_research.guardrails.budget import BudgetExceededError
+    from deep_research.memory.checkpointing import sqlite_checkpointer
     from deep_research.observability.cost import session_cost
 
-    print(f"Researching: {topic}\n")
+    thread_id = thread or uuid4().hex[:12]
+    if thread:
+        print(f"Resuming thread: {thread_id}\n")
+        payload = None  # None input = continue from the last checkpoint
+    else:
+        print(f"Researching: {topic}\nThread: {thread_id}  (resume with --thread {thread_id})\n")
+        payload = {"topic": topic}
+
+    from typing import Any, cast
+
+    graph = build_graph(checkpointer=sqlite_checkpointer())
+    config = cast(
+        "Any",
+        {
+            "configurable": {"thread_id": thread_id},
+            "callbacks": [session_cost.callback],
+        },
+    )
     try:
-        result = build_graph().invoke(
-            {"topic": topic}, config={"callbacks": [session_cost.callback]}
-        )
+        result = graph.invoke(cast("Any", payload), config=config)
     except BudgetExceededError as exc:
         print(f"STOPPED: {exc}")
+        print(f"Partial progress is checkpointed - resume with: research --thread {thread_id}")
         print(session_cost.summary())
         return
+
+    if result.get("prior_context"):
+        print("Episodic memory recalled related past research:")
+        print(result["prior_context"] + "\n")
 
     route = result.get("route")
     if route:
@@ -89,9 +112,14 @@ def main() -> None:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[union-attr]
     parser = argparse.ArgumentParser(prog="research", description="Deep research agent CLI")
     parser.add_argument("topic", nargs="?", default=None, help="Research topic (quoted)")
+    parser.add_argument(
+        "--thread",
+        default=None,
+        help="Resume a previous run from its checkpoint (thread id printed at start)",
+    )
     args = parser.parse_args()
-    if args.topic:
-        _run(args.topic)
+    if args.topic or args.thread:
+        _run(args.topic, args.thread)
     else:
         _smoke_check()
 

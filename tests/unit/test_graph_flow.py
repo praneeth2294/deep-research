@@ -15,6 +15,8 @@ from langchain_core.messages import AIMessage
 from deep_research.graph import builder
 from deep_research.graph.nodes import (
     analyst,
+    memory_recall,
+    memory_store,
     planner,
     replanner,
     researcher,
@@ -74,7 +76,15 @@ def _good_sources(tag: str) -> list[Source]:
     ]
 
 
+def _mute_memory(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Memory is best-effort and network-backed - keep unit tests offline."""
+    monkeypatch.setattr(memory_recall, "recall_similar", lambda _topic: "")
+    monkeypatch.setattr(memory_store, "store_session", lambda **_kw: None)
+    monkeypatch.setattr(memory_store, "cache_sources", lambda _sources: None)
+
+
 def test_full_flow_with_replan_and_revision(monkeypatch: pytest.MonkeyPatch) -> None:
+    _mute_memory(monkeypatch)
     monkeypatch.setattr(
         router,
         "structured_llm",
@@ -170,6 +180,7 @@ def test_full_flow_with_replan_and_revision(monkeypatch: pytest.MonkeyPatch) -> 
 
 def test_simple_lookup_short_path(monkeypatch: pytest.MonkeyPatch) -> None:
     """Trivial questions: router -> simple_answer -> END. No planner, no fan-out."""
+    _mute_memory(monkeypatch)
     monkeypatch.setattr(
         router,
         "structured_llm",

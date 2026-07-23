@@ -42,7 +42,7 @@ class ReactStep(BaseModel):
     """
 
     reasoning: str = Field(min_length=5, description="Why this action is the right next step.")
-    action: Literal["tavily_search", "wikipedia", "fetch_url", "finish"] = Field(
+    action: Literal["tavily_search", "wikipedia", "fetch_url", "semantic_search", "finish"] = Field(
         description="The tool to call next, or 'finish' when evidence is sufficient."
     )
     action_input: str = Field(

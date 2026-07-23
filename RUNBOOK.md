@@ -224,9 +224,59 @@ uv run pytest tests/unit/test_react_researcher.py tests/unit/test_scraper.py tes
 | `429 RESOURCE_EXHAUSTED ... PerDay ... FreeTier` | Free-tier Gemini has small **per-day** quotas per model; ReAct multiplies call volume | Wait for the daily reset, lower `REQUESTS_PER_MINUTE` (default now 12), reduce `MAX_REACT_ITERATIONS`, or use a paid key |
 | `CircuitOpenError` in researcher history | A domain failed 3+ times recently | Expected behavior — the agent adapts; the domain is retried after a 5-minute cooldown |
 
-## Phase 5 — Memory *(arrives with sprint 05)*
+## Phase 5 — Memory
 
-Will add: `docker compose up qdrant` and checkpoint/resume commands.
+No Docker needed: memory runs on embedded Chroma under `data/memory/`;
+checkpoints live in `data/checkpoints.sqlite`. (Qdrant swap = `vector_store.py`.)
+
+### Durable execution / resume
+
+Every run prints its thread id:
+
+```
+Thread: d7a84c44087d  (resume with --thread d7a84c44087d)
+```
+
+Resume a crashed or budget-stopped run from its last checkpoint:
+
+```bash
+uv run research --thread d7a84c44087d
+```
+
+### See memory working
+
+Run two related topics back to back:
+
+```bash
+uv run research "Qdrant vs Chroma for production RAG systems"
+```
+
+```bash
+uv run research "Which vector database should a startup choose?"
+```
+
+The second run prints `Episodic memory recalled related past research: ...` and
+researchers may show `via semantic_search, tavily_search` (cached sources reused).
+
+### Wipe memory / checkpoints (fresh start)
+
+```bash
+rm -rf data/
+```
+
+### Offline proofs
+
+```bash
+uv run pytest tests/unit/test_checkpoint_resume.py tests/unit/test_memory.py -v
+```
+
+### New knobs (.env)
+
+| Variable | Default | Effect |
+|---|---|---|
+| `EMBEDDING_MODEL` | `models/gemini-embedding-001` | Embeddings for memory (separate quota pool) |
+| `MEMORY_PATH` | `data/memory` | Chroma persistence directory |
+| `CHECKPOINT_PATH` | `data/checkpoints.sqlite` | Durable checkpoint store |
 
 ## Phase 6 — Guardrails *(arrives with sprint 06)*
 
@@ -245,7 +295,7 @@ Will add: `docker compose up` (full stack) and the one-command demo.
 
 ---
 
-## Run the whole application (current state: Phase 4)
+## Run the whole application (current state: Phase 5)
 
 1. One-time setup (if not done): `uv sync`, copy `.env.example` → `.env`, fill
    `GOOGLE_API_KEY` + `TAVILY_API_KEY`.
@@ -257,17 +307,21 @@ uv run research "your research topic here"
 
 What happens: **router** (cheap LLM) triages the topic — trivial questions go
 straight to **simple_answer** (one search + one cited answer, done). Otherwise:
-**planner** decomposes the topic into 1–3 sub-topics → **researchers run in
-parallel as bounded ReAct agents** (seeded search, then up to N self-chosen
-tavily/wikipedia/fetch_url calls, action history recorded) → **quality gate**
-(pure Python) scores evidence; failing sub-topics go to the **replanner** for one
+**memory_recall** checks episodic memory for related past sessions (seeds the
+planner) → **planner** decomposes the topic into 1–3 sub-topics → **researchers
+run in parallel as bounded ReAct agents** (seeded search, then up to N
+self-chosen tavily/wikipedia/fetch_url/**semantic_search** calls) → **quality
+gate** scores evidence; failing sub-topics go to the **replanner** for one
 bounded re-research → **analyst** dedupes sources and extracts claims →
 **synthesizer** cross-references and detects conflicts → **writer** drafts the
-cited report → **reviewer** scores 0–10 with a bounded revision loop → report +
-sources + **cost summary** printed.
+cited report → **reviewer** scores 0–10 with a bounded revision loop →
+**memory_store** persists the session summary (episodic) and all sources
+(semantic) → report + sources + **cost summary** printed.
 
-All scraped/searched text is injection-sanitized at the tool registry; the
-scraper enforces SSRF policy, timeouts, and a per-domain circuit breaker.
+Durability: state is checkpointed after every step (SQLite); any run can resume
+with `--thread <id>`. All scraped/searched text is injection-sanitized at the
+tool registry; the scraper enforces SSRF policy, timeouts, and a per-domain
+circuit breaker.
 
 Cross-cutting: all LLM calls flow through budget gate → fallback chain → shared
 rate limiter; the session stops cleanly if `MAX_SESSION_BUDGET_USD` is reached.

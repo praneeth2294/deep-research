@@ -6,6 +6,9 @@ Decide the single best next action given what you have already learned:
 
 - If the evidence so far misses an angle of the sub-topic, run a NEW search
   (never repeat a query you already ran — vary the terms or the tool).
+- semantic_search queries this system's memory of past research — instant and
+  free. Worth one early try when the sub-topic may overlap earlier sessions;
+  move on to the web if it returns little.
 - Use wikipedia for definitions, background, and established facts.
 - Use fetch_url when an earlier result looks important but its snippet is too
   thin to cite — fetching the page gives you its full text.

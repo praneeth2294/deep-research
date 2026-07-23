@@ -36,8 +36,8 @@ class Settings(BaseSettings):
 
     # --- Model tiering (Phase 3 wires these into real clients) -------------
     cheap_model: str = Field(
-        default="gemini-flash-latest",
-        description="Fast/cheap model: router, planner, reviewer, gate-adjacent tasks.",
+        default="gemini-flash-lite-latest",
+        description="Fast/cheap model: router, planner, replanner, reviewer, ReAct steps.",
     )
     strong_model: str = Field(
         default="gemini-3-flash-preview",
@@ -48,11 +48,11 @@ class Settings(BaseSettings):
         ),
     )
     cheap_fallbacks: str = Field(
-        default="gemini-3-flash-preview",
+        default="gemini-3.1-flash-lite",
         description="Comma-separated fallback models tried when the cheap model fails.",
     )
     strong_fallbacks: str = Field(
-        default="gemini-flash-latest",
+        default="gemini-3.1-flash-lite",
         description="Comma-separated fallback models tried when the strong model fails.",
     )
 
@@ -78,6 +78,20 @@ class Settings(BaseSettings):
         default=12,
         ge=1,
         description="Shared RPM cap across all LLM calls; free-tier Gemini allows ~10-20.",
+    )
+
+    # --- Memory (Phase 5) ---------------------------------------------------
+    embedding_model: str = Field(
+        default="models/gemini-embedding-001",
+        description="Embedding model for episodic/semantic memory.",
+    )
+    memory_path: str = Field(
+        default="data/memory",
+        description="Directory for the embedded vector store (Chroma).",
+    )
+    checkpoint_path: str = Field(
+        default="data/checkpoints.sqlite",
+        description="SQLite file for durable graph checkpoints (resume by thread id).",
     )
 
     # --- Quality thresholds -------------------------------------------------

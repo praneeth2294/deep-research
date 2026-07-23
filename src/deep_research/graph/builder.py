@@ -23,12 +23,15 @@ Routing rules live here, next to the wiring, so the whole control flow is
 readable in one file. Nodes stay pure (state in, partial state out).
 """
 
+from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.types import Send
 
 from deep_research.config import get_settings
 from deep_research.graph.nodes.analyst import analyst_node
+from deep_research.graph.nodes.memory_recall import memory_recall_node
+from deep_research.graph.nodes.memory_store import memory_store_node
 from deep_research.graph.nodes.planner import planner_node
 from deep_research.graph.nodes.quality_gate import quality_gate_node
 from deep_research.graph.nodes.replanner import replanner_node
@@ -43,7 +46,7 @@ from deep_research.graph.state import ResearchState
 
 def route_after_router(state: ResearchState) -> str:
     """LLM-routing branch: trivial questions skip the whole pipeline."""
-    return "simple_answer" if state.get("route") == "simple_lookup" else "planner"
+    return "simple_answer" if state.get("route") == "simple_lookup" else "memory_recall"
 
 
 def fan_out_researchers(state: ResearchState) -> list[Send]:
@@ -68,21 +71,29 @@ def fan_out_replanned(state: ResearchState) -> list[Send]:
 
 
 def route_after_review(state: ResearchState) -> str:
-    """Evaluator-Optimiser routing: accept, or revise while budget remains."""
+    """Evaluator-Optimiser routing: accept (via memory write-back), or revise."""
     settings = get_settings()
     review = state.get("review")
     if review is None or review.score >= settings.reviewer_pass_score:
-        return END
+        return "memory_store"
     if state.get("revision_count", 0) >= settings.max_writer_revisions:
-        return END
+        return "memory_store"
     return "writer"
 
 
-def build_graph() -> CompiledStateGraph[ResearchState]:
-    """Build and compile the research graph (no I/O happens until invoke)."""
+def build_graph(
+    checkpointer: BaseCheckpointSaver[str] | None = None,
+) -> CompiledStateGraph[ResearchState]:
+    """Build and compile the research graph (no I/O happens until invoke).
+
+    Pass a checkpointer for durable execution: state persists after every
+    superstep and a run can resume by thread_id after a crash.
+    """
     graph: StateGraph[ResearchState] = StateGraph(ResearchState)
     graph.add_node("router", router_node)
     graph.add_node("simple_answer", simple_answer_node)
+    graph.add_node("memory_recall", memory_recall_node)
+    graph.add_node("memory_store", memory_store_node)
     graph.add_node("planner", planner_node)
     graph.add_node("researcher", researcher_node)  # Send() delivers ResearcherInput payloads
     graph.add_node("quality_gate", quality_gate_node)
@@ -93,8 +104,9 @@ def build_graph() -> CompiledStateGraph[ResearchState]:
     graph.add_node("reviewer", reviewer_node)
 
     graph.add_edge(START, "router")
-    graph.add_conditional_edges("router", route_after_router, ["simple_answer", "planner"])
+    graph.add_conditional_edges("router", route_after_router, ["simple_answer", "memory_recall"])
     graph.add_edge("simple_answer", END)
+    graph.add_edge("memory_recall", "planner")
     graph.add_conditional_edges("planner", fan_out_researchers, ["researcher"])
     graph.add_edge("researcher", "quality_gate")
     graph.add_conditional_edges("quality_gate", route_after_gate, ["replanner", "analyst"])
@@ -102,5 +114,6 @@ def build_graph() -> CompiledStateGraph[ResearchState]:
     graph.add_edge("analyst", "synthesizer")
     graph.add_edge("synthesizer", "writer")
     graph.add_edge("writer", "reviewer")
-    graph.add_conditional_edges("reviewer", route_after_review, ["writer", END])
-    return graph.compile()
+    graph.add_conditional_edges("reviewer", route_after_review, ["writer", "memory_store"])
+    graph.add_edge("memory_store", END)
+    return graph.compile(checkpointer=checkpointer)
