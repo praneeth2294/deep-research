@@ -1,0 +1,12 @@
+{"topic": "What does RAG stand for in AI?", "expected_route": "simple_lookup", "facets": ["retrieval", "generation"]}
+{"topic": "Who maintains the LangGraph framework?", "expected_route": "simple_lookup", "facets": ["LangChain"]}
+{"topic": "Qdrant vs Chroma for production RAG systems", "expected_route": "comparison", "facets": ["scaling", "deployment"]}
+{"topic": "LangGraph vs CrewAI for building multi-agent systems", "expected_route": "comparison", "facets": ["state management", "adoption"]}
+{"topic": "Impact of the EU AI Act on early-stage startups", "expected_route": "deep_research", "facets": ["obligations", "timeline", "sandboxes"]}
+{"topic": "State of open-source LLM agent frameworks in 2026", "expected_route": "deep_research", "facets": ["capabilities", "adoption", "tradeoffs"]}
+{"topic": "How do vector databases implement approximate nearest neighbour search?", "expected_route": "any", "facets": ["HNSW", "indexing"]}
+{"topic": "Best practices for prompt injection defense in production LLM applications", "expected_route": "deep_research", "facets": ["sanitization", "layered defenses"]}
+{"topic": "Trends in AI agent observability tooling for production systems", "expected_route": "deep_research", "facets": ["tracing", "evaluation"]}
+{"topic": "What is the context window of a large language model?", "expected_route": "simple_lookup", "facets": ["tokens"]}
+{"topic": "Serverless GPU inference platforms compared for startups", "expected_route": "comparison", "facets": ["pricing", "cold starts"]}
+{"topic": "How does retrieval augmented generation reduce hallucinations?", "expected_route": "any", "facets": ["grounding", "citations"]}

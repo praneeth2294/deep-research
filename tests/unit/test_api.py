@@ -8,6 +8,7 @@ tests poll with a timeout exactly like an HTTP client would.
 import json
 import sqlite3
 import time
+from collections.abc import Generator
 from pathlib import Path
 from typing import Any
 
@@ -17,10 +18,20 @@ from langgraph.checkpoint.sqlite import SqliteSaver
 
 from deep_research.api import app as app_module
 from deep_research.api.manager import SessionManager
+from deep_research.config import get_settings
 from deep_research.graph import builder
 from tests.unit.fakes import wire_deep_pipeline
 
 _TIMEOUT_S = 10.0
+
+
+@pytest.fixture(autouse=True)
+def _tmp_observability(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Generator[None]:
+    monkeypatch.setenv("TRACES_PATH", str(tmp_path / "traces"))
+    monkeypatch.setenv("FEEDBACK_PATH", str(tmp_path / "feedback.jsonl"))
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
 
 
 def _client(monkeypatch: pytest.MonkeyPatch, queries: list[str] | None = None) -> TestClient:
@@ -80,13 +91,17 @@ def test_full_http_flow_with_plan_edit(monkeypatch: pytest.MonkeyPatch) -> None:
     assert {"planner", "writer", "reviewer"} <= nodes_seen
     assert lines[-1] == "data: [DONE]"
 
-    # 6. feedback lands in the store
-    feedback_path = Path("data/feedback.jsonl")
-    monkeypatch.setattr(app_module, "_FEEDBACK_PATH", feedback_path)
+    # 6. feedback lands in the store (isolated to a temp dir)
     response = client.post(
         "/feedback", json={"thread_id": thread_id, "rating": "up", "comment": "solid"}
     )
     assert response.json() == {"status": "recorded"}
+    feedback_file = Path(get_settings().feedback_path)
+    assert thread_id in feedback_file.read_text(encoding="utf-8")
+
+    # 7. the trace endpoint shows the run's spans
+    trace_text = client.get(f"/research/{thread_id}/trace").json()["trace"]
+    assert "spans" in trace_text
 
 
 def test_cancel_via_http(monkeypatch: pytest.MonkeyPatch) -> None:

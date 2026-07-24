@@ -11,8 +11,6 @@ Run:   uv run uvicorn deep_research.api.app:app
 
 import asyncio
 import json
-from datetime import UTC, datetime
-from pathlib import Path
 from typing import Any, Literal
 
 from fastapi import FastAPI, HTTPException
@@ -20,9 +18,10 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from deep_research.api.manager import SessionManager
+from deep_research.observability.feedback import record_feedback
+from deep_research.observability.tracing import format_trace
 from deep_research.schemas.planner import SubTopic
 
-_FEEDBACK_PATH = Path("data/feedback.jsonl")
 _STREAM_POLL_S = 0.3
 
 
@@ -118,16 +117,13 @@ def create_app(manager: SessionManager | None = None) -> FastAPI:
     @app.post("/feedback")
     def feedback(request: FeedbackRequest) -> dict[str, str]:
         _session(request.thread_id)  # 404 for unknown threads
-        _FEEDBACK_PATH.parent.mkdir(parents=True, exist_ok=True)
-        record = {
-            "thread_id": request.thread_id,
-            "rating": request.rating,
-            "comment": request.comment,
-            "timestamp": datetime.now(tz=UTC).isoformat(),
-        }
-        with _FEEDBACK_PATH.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(record) + "\n")
+        record_feedback(request.thread_id, request.rating, request.comment)
         return {"status": "recorded"}
+
+    @app.get("/research/{thread_id}/trace")
+    def get_trace(thread_id: str) -> dict[str, str]:
+        _session(thread_id)
+        return {"trace": format_trace(thread_id)}
 
     return app
 

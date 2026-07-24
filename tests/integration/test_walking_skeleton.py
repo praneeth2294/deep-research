@@ -20,7 +20,7 @@ requires_keys = pytest.mark.skipif(
 def test_deep_pipeline_produces_cited_report() -> None:
     from deep_research.graph.builder import build_graph
 
-    result = build_graph().invoke(
+    result = build_graph(hitl=False).invoke(
         {"topic": "Compare LangGraph and CrewAI for building production multi-agent systems"}
     )
 
@@ -36,7 +36,7 @@ def test_deep_pipeline_produces_cited_report() -> None:
 def test_simple_lookup_short_path() -> None:
     from deep_research.graph.builder import build_graph
 
-    result = build_graph().invoke({"topic": "What does RAG stand for in AI?"})
+    result = build_graph(hitl=False).invoke({"topic": "What does RAG stand for in AI?"})
 
     assert result["route"] == "simple_lookup"
     assert "sub_topics" not in result  # planner never ran

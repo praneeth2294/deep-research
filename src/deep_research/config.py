@@ -94,6 +94,22 @@ class Settings(BaseSettings):
         description="SQLite file for durable graph checkpoints (resume by thread id).",
     )
 
+    # --- Observability (Phase 8) --------------------------------------------
+    traces_path: str = Field(
+        default="data/traces",
+        description="Directory for local trace files (one JSONL per thread).",
+    )
+    feedback_path: str = Field(
+        default="data/feedback.jsonl",
+        description="Append-only store of user feedback, keyed by thread/trace id.",
+    )
+    langfuse_public_key: SecretStr | None = None
+    langfuse_secret_key: SecretStr | None = None
+    langfuse_host: str = Field(default="https://cloud.langfuse.com")
+    eval_sample_size: int = Field(
+        default=2, ge=1, description="Golden-dataset topics per eval run (full set nightly)."
+    )
+
     # --- Guardrails (Phase 6) ----------------------------------------------
     blocked_domains: str = Field(
         default="",

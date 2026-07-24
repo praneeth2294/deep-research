@@ -14,6 +14,7 @@ from uuid import uuid4
 from langgraph.types import Command
 
 from deep_research.observability.cost import CostTracker
+from deep_research.observability.tracing import TraceRecorder, langfuse_handler
 
 SessionStatus = Literal["running", "awaiting_approval", "done", "cancelled", "error"]
 
@@ -30,6 +31,7 @@ class Session:
     result: dict[str, Any] | None = None
     error: str | None = None
     tracker: CostTracker = field(default_factory=CostTracker)
+    recorder: TraceRecorder | None = None
 
     def is_terminal(self) -> bool:
         return self.status in _TERMINAL
@@ -48,6 +50,7 @@ class SessionManager:
 
     def start(self, topic: str) -> Session:
         session = Session(thread_id=uuid4().hex[:12], topic=topic)
+        session.recorder = TraceRecorder(session.thread_id)
         with self._lock:
             self._sessions[session.thread_id] = session
         self._spawn(session, {"topic": topic})
@@ -68,9 +71,15 @@ class SessionManager:
         thread.start()
 
     def _config(self, session: Session) -> dict[str, Any]:
+        callbacks: list[Any] = [session.tracker.callback]
+        if session.recorder is not None:
+            callbacks.append(session.recorder)
+        langfuse = langfuse_handler()
+        if langfuse is not None:
+            callbacks.append(langfuse)
         return {
             "configurable": {"thread_id": session.thread_id},
-            "callbacks": [session.tracker.callback],
+            "callbacks": callbacks,
         }
 
     def _drive(self, session: Session, payload: Any) -> None:
@@ -91,6 +100,9 @@ class SessionManager:
             session.status = "error"
             session.error = str(exc)
             session.events.append({"event": "error", "detail": str(exc)})
+        finally:
+            if session.recorder is not None:
+                session.recorder.flush()
 
     def _finish(self, session: Session, config: dict[str, Any]) -> None:
         state = self._graph.get_state(config).values or {}

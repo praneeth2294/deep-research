@@ -375,9 +375,44 @@ curl -s -X POST localhost:8000/feedback -H "Content-Type: application/json" -d "
 uv run pytest tests/unit/test_hitl.py tests/unit/test_api.py -v
 ```
 
-## Phase 8 — Observability + Evals *(arrives with sprint 08)*
+## Phase 8 — Observability + Evals
 
-Will add: `docker compose up langfuse` and `uv run pytest tests/evals`.
+Every run now writes a trace (`data/traces/<thread_id>.jsonl`). View it:
+
+```bash
+uv run research --show-trace <thread_id>
+```
+
+Shows every node + LLM span with offset, duration, tokens, and the cost
+rollup — plus any feedback attached to the run. Over HTTP:
+`GET /research/{thread_id}/trace`, and `POST /feedback` ties 👍/👎 to the trace.
+
+### Optional Langfuse export (no code changes)
+
+```bash
+uv add langfuse
+```
+
+Then set `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY` in `.env` — every run
+is exported automatically alongside the local trace.
+
+### Run the evals (live — costs API calls)
+
+```bash
+uv run pytest tests/evals -m evals -s
+```
+
+Sample size via `EVAL_SAMPLE_SIZE` (default 2; bump for a full nightly pass).
+Each topic runs the real pipeline, then two gates: the deterministic citation
+check (every `[n]` must resolve to a real source) and the LLM-as-judge
+(faithfulness / coverage / citation quality ≥ 7). Self-skips without keys —
+the CI `evals` job runs automatically once repo secrets are configured.
+
+### Offline observability tests
+
+```bash
+uv run pytest tests/unit/test_observability.py -v
+```
 
 ## Phase 9 — Packaging *(arrives with sprint 09)*
 
@@ -385,7 +420,7 @@ Will add: `docker compose up` (full stack) and the one-command demo.
 
 ---
 
-## Run the whole application (current state: Phase 7)
+## Run the whole application (current state: Phase 8)
 
 Two ways to run: the CLI (below) or the HTTP API (see Phase 7 section for the
 full curl walkthrough — submit, approve the plan, stream progress, feedback).
@@ -418,7 +453,8 @@ cited report → **reviewer** scores 0–10 with a bounded revision loop →
 Durability: state is checkpointed after every step (SQLite); any run can resume
 with `--thread <id>`. All scraped/searched text is injection-sanitized at the
 tool registry; the scraper enforces SSRF policy, timeouts, and a per-domain
-circuit breaker.
+circuit breaker. Every run is traced (`--show-trace <id>`: spans, tokens,
+cost); feedback ties to the trace; quality is gated by the eval suite.
 
 Cross-cutting: all LLM calls flow through budget gate → fallback chain → shared
 rate limiter; the session stops cleanly if `MAX_SESSION_BUDGET_USD` is reached.

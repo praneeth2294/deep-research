@@ -89,12 +89,20 @@ def _run(topic: str | None, thread: str | None, auto_approve: bool = False) -> N
 
     from typing import Any, cast
 
+    from deep_research.observability.tracing import TraceRecorder, langfuse_handler
+
+    recorder = TraceRecorder(thread_id)
+    callbacks: list[Any] = [session_cost.callback, recorder]
+    langfuse = langfuse_handler()
+    if langfuse is not None:
+        callbacks.append(langfuse)
+
     graph = build_graph(checkpointer=sqlite_checkpointer())
     config = cast(
         "Any",
         {
             "configurable": {"thread_id": thread_id},
-            "callbacks": [session_cost.callback],
+            "callbacks": callbacks,
         },
     )
     try:
@@ -110,6 +118,8 @@ def _run(topic: str | None, thread: str | None, auto_approve: bool = False) -> N
         print(f"\nResume once ready with: research --thread {thread_id}")
         print(session_cost.summary())
         return
+    finally:
+        recorder.flush()
 
     if result.get("refusal"):
         print("REFUSED:")
@@ -163,6 +173,7 @@ def _run(topic: str | None, thread: str | None, auto_approve: bool = False) -> N
     for i, source in enumerate(result.get("sources", []), start=1):
         print(f"  [{i}] {source.title} — {source.url}")
     print("\n" + session_cost.summary())
+    print(f"Trace: research --show-trace {thread_id}")
 
 
 def main() -> None:
@@ -185,8 +196,18 @@ def main() -> None:
         action="store_true",
         help="Skip the plan-approval prompt (for demos/scripts)",
     )
+    parser.add_argument(
+        "--show-trace",
+        default=None,
+        metavar="THREAD_ID",
+        help="Print the span timeline of a past run and exit",
+    )
     args = parser.parse_args()
-    if args.topic or args.thread:
+    if args.show_trace:
+        from deep_research.observability.tracing import format_trace
+
+        print(format_trace(args.show_trace))
+    elif args.topic or args.thread:
         _run(args.topic, args.thread, auto_approve=args.auto_approve)
     else:
         _smoke_check()

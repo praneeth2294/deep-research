@@ -20,12 +20,16 @@ _PRICE_TABLE: list[tuple[str, float, float]] = [
 _DEFAULT_PRICE = (0.30, 2.50)  # assume flash-class when unknown
 
 
-def _price_for(model_name: str) -> tuple[float, float]:
+def price_for(model_name: str) -> tuple[float, float]:
+    """(input, output) USD per 1M tokens for a model name (substring match)."""
     name = model_name.lower()
     for needle, in_price, out_price in _PRICE_TABLE:
         if needle in name:
             return (in_price, out_price)
     return _DEFAULT_PRICE
+
+
+_price_for = price_for  # backwards-compatible alias
 
 
 class CostTracker:
