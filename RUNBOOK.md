@@ -414,16 +414,47 @@ the CI `evals` job runs automatically once repo secrets are configured.
 uv run pytest tests/unit/test_observability.py -v
 ```
 
-## Phase 9 — Packaging *(arrives with sprint 09)*
+## Phase 9 — Packaging
 
-Will add: `docker compose up` (full stack) and the one-command demo.
+### One-command demo (3 scenarios: refusal, short path, full pipeline)
+
+```bash
+uv run python scripts/run_demo.py
+```
+
+Works without keys too (runs the $0 guardrail scenario only).
+
+### Docker
+
+```bash
+docker compose up --build
+```
+
+API on `localhost:8000`, `data/` (checkpoints, memory, traces) persisted on the
+host. Optional Qdrant alongside:
+
+```bash
+docker compose --profile qdrant up --build
+```
+
+(Note: image follows the standard uv multi-stage pattern; build-verify on a
+Docker-equipped machine — the dev box for this project had none.)
 
 ---
 
-## Run the whole application (current state: Phase 8)
+## Run the whole application (FINAL — all 9 phases complete)
 
-Two ways to run: the CLI (below) or the HTTP API (see Phase 7 section for the
-full curl walkthrough — submit, approve the plan, stream progress, feedback).
+Three ways to run:
+
+1. **CLI** (below) — `uv run research "topic"`, interactive plan approval.
+2. **HTTP API** — `uv run uvicorn deep_research.api.app:app --port 8000`; full
+   curl walkthrough in the Phase 7 section (submit → approve → stream → trace →
+   feedback).
+3. **Docker** — `docker compose up --build` (Phase 9 section).
+
+First-time setup: `uv sync` → copy `.env.example` to `.env` → add
+`GOOGLE_API_KEY` + `TAVILY_API_KEY`. Verify with `uv run pytest` (131 offline
+tests) and `uv run python scripts/run_demo.py`.
 
 1. One-time setup (if not done): `uv sync`, copy `.env.example` → `.env`, fill
    `GOOGLE_API_KEY` + `TAVILY_API_KEY`.

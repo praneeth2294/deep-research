@@ -1,0 +1,22 @@
+# Full stack:      docker compose up --build
+# With Qdrant too: docker compose --profile qdrant up --build
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file: .env
+    volumes:
+      # checkpoints, memory, traces, feedback survive restarts
+      - ./data:/app/data
+
+  # Optional: production vector DB. The app runs embedded Chroma by default;
+  # swapping to Qdrant is a change in src/deep_research/memory/vector_store.py
+  # only (see docs/adr/004-embedded-chroma-over-qdrant.md).
+  qdrant:
+    image: qdrant/qdrant:v1.13.4
+    profiles: ["qdrant"]
+    ports:
+      - "6333:6333"
+    volumes:
+      - ./data/qdrant:/qdrant/storage
