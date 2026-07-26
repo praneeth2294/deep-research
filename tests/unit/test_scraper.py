@@ -1,5 +1,7 @@
 """Scraper: SSRF policy, text extraction, and the circuit breaker (no network)."""
 
+import time
+
 import pytest
 
 from deep_research.tools import scraper
@@ -68,7 +70,10 @@ def test_circuit_breaker_opens_after_three_failures(monkeypatch: pytest.MonkeyPa
 
 
 def test_circuit_closes_after_cooldown(monkeypatch: pytest.MonkeyPatch) -> None:
-    scraper._breaker["slow.example"] = (3, 0.0)  # opened long ago
+    # Opened just past the cooldown window. Never use an absolute value like 0.0:
+    # time.monotonic() counts from boot, so 0.0 is "recent" on a fresh CI runner.
+    opened_at = time.monotonic() - scraper._COOLDOWN_S - 1
+    scraper._breaker["slow.example"] = (3, opened_at)
     monkeypatch.setattr(scraper, "_fetch_html", lambda _u: "<title>ok</title><body>fine</body>")
     [source] = scraper.fetch_url("https://slow.example/page")  # cooldown elapsed -> probe allowed
     assert source.title == "ok"
