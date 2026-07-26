@@ -27,7 +27,17 @@ jobs:
         run: uv run mypy
 
       - name: Unit tests
-        run: uv run pytest
+        run: |
+          set -o pipefail
+          uv run pytest 2>&1 | tee pytest-output.txt
+
+      - name: Publish test output to job summary (on failure)
+        if: failure()
+        run: |
+          echo '## Unit test output (tail)' >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          tail -n 80 pytest-output.txt >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
 
   evals:
     # Live eval suite: runs only when API keys are configured as repo secrets.
