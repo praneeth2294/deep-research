@@ -131,6 +131,7 @@ lever in the system.
 
 | Doc | What it is |
 |---|---|
+| [docs/CODE_TOUR.md](docs/CODE_TOUR.md) | Beginner's tour: every file explained simply, starting from builder.py |
 | [docs/HLD.md](docs/HLD.md) | High-level design: context, components, NFRs, cross-cutting concerns |
 | [docs/LLD.md](docs/LLD.md) | Low-level design: node contracts, state, algorithms, API, storage, errors |
 | [PROJECT_PLAN.md](PROJECT_PLAN.md) | Problem statement, architecture, phased build plan |
