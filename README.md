@@ -131,6 +131,8 @@ lever in the system.
 
 | Doc | What it is |
 |---|---|
+| [docs/HLD.md](docs/HLD.md) | High-level design: context, components, NFRs, cross-cutting concerns |
+| [docs/LLD.md](docs/LLD.md) | Low-level design: node contracts, state, algorithms, API, storage, errors |
 | [PROJECT_PLAN.md](PROJECT_PLAN.md) | Problem statement, architecture, phased build plan |
 | [DECK_EXPLAINED.md](DECK_EXPLAINED.md) | Plain-English explanation of every underlying concept |
 | [docs/patterns.md](docs/patterns.md) | Pattern → implementation → test map |
