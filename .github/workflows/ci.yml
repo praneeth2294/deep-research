@@ -38,6 +38,13 @@ jobs:
           echo '```' >> "$GITHUB_STEP_SUMMARY"
           tail -n 80 pytest-output.txt >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
+          # Also surface failures as annotations (publicly readable via API)
+          grep -E "^(FAILED|ERROR)" pytest-output.txt | head -10 | while IFS= read -r line; do
+            echo "::error::${line}"
+          done
+          tail -n 3 pytest-output.txt | while IFS= read -r line; do
+            echo "::error::tail: ${line}"
+          done
 
   evals:
     # Live eval suite: runs only when API keys are configured as repo secrets.
