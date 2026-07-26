@@ -5,6 +5,8 @@ Skipped automatically when keys are absent (e.g. in CI).
 Run locally with:  uv run pytest tests/integration -s
 """
 
+import re
+
 import pytest
 
 from deep_research.config import get_settings
@@ -29,7 +31,8 @@ def test_deep_pipeline_produces_cited_report() -> None:
     assert len(result["sources"]) >= 1
     report = result["report"]
     assert len(report) > 200
-    assert "[1]" in report  # at least one inline citation
+    # At least one inline citation, any style: [1], [8], [2, 5] ...
+    assert re.search(r"\[\d{1,3}[\],]", report), "report has no inline citations"
 
 
 @requires_keys
