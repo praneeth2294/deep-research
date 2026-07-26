@@ -38,3 +38,12 @@ def test_secrets_never_leak_in_repr(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_invalid_budget_rejected() -> None:
     with pytest.raises(ValueError):
         _fresh_settings(max_session_budget_usd=0)
+
+
+def test_empty_string_keys_are_absent(monkeypatch: pytest.MonkeyPatch) -> None:
+    """CI sets undefined secrets to '' - must read as 'no key', not a key."""
+    monkeypatch.setenv("GOOGLE_API_KEY", "")
+    monkeypatch.setenv("TAVILY_API_KEY", "   ")
+    s = _fresh_settings()
+    assert s.google_api_key is None
+    assert s.tavily_api_key is None

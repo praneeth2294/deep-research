@@ -15,7 +15,7 @@ Usage:
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -69,6 +69,20 @@ class Settings(BaseSettings):
     # --- API keys (optional at import time; call sites fail fast) ----------
     google_api_key: SecretStr | None = None
     tavily_api_key: SecretStr | None = None
+
+    @field_validator(
+        "google_api_key",
+        "tavily_api_key",
+        "langfuse_public_key",
+        "langfuse_secret_key",
+        mode="before",
+    )
+    @classmethod
+    def _empty_string_is_none(cls, value: object) -> object:
+        """CI sets undefined secrets to ''; an empty key is an absent key."""
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
 
     # --- Budgets & hard limits ---------------------------------------------
     max_session_budget_usd: float = Field(default=1.0, gt=0)

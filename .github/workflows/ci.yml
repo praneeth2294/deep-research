@@ -62,4 +62,6 @@ jobs:
       - name: Install dependencies
         run: uv sync --locked
       - name: Run evals (skips automatically when secrets are absent)
+        # Undefined secrets resolve to '' - skip the step entirely in that case.
+        if: env.GOOGLE_API_KEY != '' && env.TAVILY_API_KEY != ''
         run: uv run pytest tests/evals -m evals -s
